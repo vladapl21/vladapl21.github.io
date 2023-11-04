@@ -1,17 +1,43 @@
 body {
   font-family: sans-serif;
-}
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 20%;
+  background-color: #333333;
+  color : #CECECE;
+  }
 
 header {
   text-align: center;
+  opacity: 0.6;
+  transition: 0.5s;
+  margin-bottom: 2rem;
+  }
+
+header:hover {
+  opacity: 1;
+  font-size: 1.02rem;
+  }
+
+h3, h1 {
+  margin: 0.2rem;
 }
 
 main {
   margin: 0 auto;
   width: 50%;
   text-align: center;
-}
+  font-size: 1rem;
+  }
 
-footer {
-  text-align: center;
-}
+a {
+  color: #CECECE;
+  opacity: 0.6;
+  transition: 0.5s;
+  }
+
+a:hover {
+  opacity: 1;
+  font-size: 1.15rem;
+  }
