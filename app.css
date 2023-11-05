@@ -2,8 +2,7 @@ body {
   font-family: sans-serif;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  margin-top: 20%;
+  text-align: center;
   background-color: #333333;
   color : #CECECE;
   }
@@ -13,6 +12,7 @@ header {
   opacity: 0.6;
   transition: 0.5s;
   margin-bottom: 1.2rem;
+  margin-top: 10vw;
   }
 
 header:hover {
@@ -31,6 +31,29 @@ main {
   font-size: 1rem;
   }
 
+.horizontal-line {
+  display: block;
+  position: relative;
+  top: 27%;
+  left: 50%;
+  width: 0%;
+  height: 2px;
+  border-bottom: 2px solid #CECECE;
+  animation: line 1.5s linear forwards;
+}
+
+@keyframes line {
+  from {
+    left: 50%;
+    width: 0%;
+  }
+  to {
+    left: 20%;
+    width: 60%;
+  }
+}
+
+
 a {
   color: #CECECE;
   opacity: 0.6;
@@ -41,3 +64,19 @@ a:hover {
   opacity: 1;
   font-size: 1.15rem;
   }
+
+audio {
+  margin: 0 auto;
+  width: 8%;
+  padding: 80px;
+  background-color: #333333;
+}
+
+
+audio::-webkit-media-controls-current-time-display {display: none}
+audio::-webkit-media-controls-panel {background-color: gray}
+audio::-webkit-media-controls-timeline {display: none}
+audio::-webkit-media-controls-timeline-container {display: none}
+audio::-webkit-media-controls-volume-slider-mute-button {display: none}
+
+
