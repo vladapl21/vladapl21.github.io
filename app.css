@@ -126,7 +126,11 @@ audio::-webkit-media-controls-volume-slider-mute-button {display: none}
   header:hover {
     opacity: 0.8;
   }
+  main {
+    display: none;
+  }
   mobile {
     display: flex;
+    font-size: 30px;
   }
 }
