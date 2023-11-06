@@ -97,9 +97,9 @@ audio::-webkit-media-controls-volume-slider-mute-button {display: none}
 /* Phone capabilities */
 @media (max-width: 1200px) {
   h1 {
-    font-size: 35px;
+    font-size: 45px;
   }
   body {
-  margin-left: 5%;
+  margin-left: 8%;
   }
 }
