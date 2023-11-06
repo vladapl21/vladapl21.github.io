@@ -28,6 +28,10 @@ h2 {
   margin-bottom: 0px;
 }
 
+h4 {
+    display: none;
+}
+
 header:hover {
   opacity: 1;
   font-size: 1.02rem;
@@ -94,7 +98,8 @@ audio::-webkit-media-controls-timeline {display: none}
 audio::-webkit-media-controls-timeline-container {display: none}
 audio::-webkit-media-controls-volume-slider-mute-button {display: none}
 
-/* Phone capabilities */
+
+/* Mobile device capabilities */
 @media (max-width: 1200px) {
   h1 {
     font-size: 42px;
@@ -105,5 +110,12 @@ audio::-webkit-media-controls-volume-slider-mute-button {display: none}
   }
   h2 {
     display: none;
+  }
+  h4 {
+    display: flex;
+    font-family: sans-serif;
+    font-weight: lighter;
+    font-size: 15px;
+    margin-bottom: 0px;
   }
 }
