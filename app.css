@@ -133,4 +133,16 @@ audio::-webkit-media-controls-volume-slider-mute-button {display: none}
     display: flex;
     font-size: 30px;
   }
+  p {
+    font-size: 30px;
+  }
+  a {
+  color: #CECECE;
+  opacity: 0.6;
+  transition: 0.5s;
+  }
+  a:hover {
+  opacity: 1;
+  font-size: 1rem;
+  }
 }
