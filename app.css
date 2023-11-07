@@ -102,6 +102,12 @@ audio::-webkit-media-controls-timeline {display: none}
 audio::-webkit-media-controls-timeline-container {display: none}
 audio::-webkit-media-controls-volume-slider-mute-button {display: none}
 
+.profile-picture {
+  width: 20px;
+  height: 20px;
+  margin-right: 5px;
+}
+
 
 /* Mobile device capabilities */
 @media (max-width: 1200px) {
