@@ -132,7 +132,7 @@ audio::-webkit-media-controls-volume-slider-mute-button {display: none}
 
 
 /* Mobile device capabilities */
-@media (max-width: 1200px) {
+@media (max-width: 900px) {
   h1 {
     font-size: 42px;
   }
@@ -144,7 +144,7 @@ audio::-webkit-media-controls-volume-slider-mute-button {display: none}
     display: none;
   }
   header {
-  margin-top: 16vh;
+  margin-top: 20vh;
   }
   h4 {
     display: flex;
