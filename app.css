@@ -15,6 +15,7 @@ header {
   transition: 0.5s;
   margin-bottom: 1.2rem;
   margin-top: 30vh;
+  animation: fadeIn 2s ease-in-out;
   }
 
 h1 {
@@ -51,6 +52,7 @@ main {
   display: inline-block;
   width: 50%;
   font-size: 1.3rem;
+  animation: fadeInUp 3s ease-in-out forwards;
   }
 
 mobile {
@@ -65,7 +67,7 @@ mobile {
   width: 0%;
   height: 2px;
   border-bottom: 2px solid #CECECE;
-  animation: line 2s linear forwards;
+  animation: line 3s linear forwards;
 }
 
 @keyframes line {
@@ -76,6 +78,26 @@ mobile {
   to {
     left: 0%;
     width: 55%;
+  }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 0.6;
+    }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(-100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
@@ -137,6 +159,7 @@ audio::-webkit-media-controls-volume-slider-mute-button {display: none}
   mobile {
     display: flex;
     font-size: 30px;
+    animation: fadeInUp 3s ease-in-out forwards
   }
   p {
     font-size: 15px;
