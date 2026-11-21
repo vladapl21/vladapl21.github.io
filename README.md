@@ -2,7 +2,7 @@
 
 My personal site: experience and projects laid out on a chessboard that stands on a coffee table in a living room. Half the pieces, white and black, open a section; the gold boxes around them are a detection-style overlay computed from the 3D scene. Left alone, the page cycles pop-up labels through the sections, and the camera drifts back home a few seconds after you stop dragging it.
 
-Live at https://vladapl21.github.io/
+Live at https://vladplyushchenko.netlify.app/ (also still served by GitHub Pages at https://vladapl21.github.io/)
 
 ## Editing
 
