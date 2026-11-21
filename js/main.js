@@ -236,6 +236,11 @@ $('#name').textContent = person.name;
 $('#year').textContent = new Date().getFullYear();
 
 try {
+  // The pennant on the wall is drawn with the display font, so wait for it (briefly).
+  await Promise.race([
+    document.fonts.load('800 100px "Sofia Sans Extra Condensed"'),
+    new Promise((resolve) => setTimeout(resolve, 1500)),
+  ]).catch(() => {});
   const { createBoard } = await import('./board.js');
   board = createBoard({
     canvas: $('#scene'),

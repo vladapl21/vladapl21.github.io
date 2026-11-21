@@ -30,11 +30,14 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
   renderer.shadowMap.type = THREE.PCFShadowMap;
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x081a28);
-  scene.fog = new THREE.Fog(0x081a28, 90, 230);
+  scene.background = new THREE.Color(0x03090f);
+  scene.fog = new THREE.Fog(0x03090f, 45, 170);
+  // Reflections for the pieces and board only; the room gets almost none of
+  // this light, so it stays dark around the lit table.
   const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-  scene.environmentIntensity = 0.32;
+  const reflections = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environment = reflections;
+  scene.environmentIntensity = 0.045;
 
   const camera = new THREE.PerspectiveCamera(32, 1, 0.2, 400);
   const controls = new OrbitControls(camera, canvas);
@@ -52,26 +55,27 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
   controls.maxAzimuthAngle = 1.75;
 
   // ---- lights ----
-  const key = new THREE.DirectionalLight(0xffe9c8, 2.4);
-  key.position.set(-9, 22, 10);
+  // One lamp over the table: a pool of light on the board that falls off
+  // quickly, so the board is the brightest thing in the room.
+  const key = new THREE.SpotLight(0xffe9c8, 3300, 80, 0.5, 0.85, 2);
+  key.position.set(-6, 29, 8);
+  key.target.position.set(0, 0, 0);
   key.castShadow = true;
   key.shadow.mapSize.set(2048, 2048);
-  key.shadow.camera.left = key.shadow.camera.bottom = -24;
-  key.shadow.camera.right = key.shadow.camera.top = 24;
-  key.shadow.camera.near = 1;
-  key.shadow.camera.far = 70;
-  key.shadow.bias = -0.0005;
+  key.shadow.camera.near = 6;
+  key.shadow.camera.far = 60;
+  key.shadow.bias = -0.0004;
   key.shadow.normalBias = 0.03;
   key.shadow.radius = 5;
-  scene.add(key);
-  scene.add(new THREE.HemisphereLight(0x9fc4ea, 0x3a2a1c, 0.5));
+  scene.add(key, key.target);
+  scene.add(new THREE.HemisphereLight(0x9fc4ea, 0x2a2018, 0.11));
 
   scene.add(buildRoom());
-  scene.add(buildBoard(renderer));
+  scene.add(buildBoard(renderer, reflections));
 
   // ---- pieces: all 32, some of which carry a section ----
-  const ivory = new THREE.MeshPhysicalMaterial({ color: 0xebe3d0, roughness: 0.34, clearcoat: 0.5, clearcoatRoughness: 0.25 });
-  const navy = new THREE.MeshPhysicalMaterial({ color: 0x0f3355, roughness: 0.28, metalness: 0.15, clearcoat: 0.7, clearcoatRoughness: 0.2 });
+  const ivory = new THREE.MeshPhysicalMaterial({ color: 0xebe3d0, roughness: 0.34, clearcoat: 0.5, clearcoatRoughness: 0.25, envMap: reflections, envMapIntensity: 0.3 });
+  const navy = new THREE.MeshPhysicalMaterial({ color: 0x123a60, roughness: 0.28, metalness: 0.15, clearcoat: 0.7, clearcoatRoughness: 0.2, envMap: reflections, envMapIntensity: 0.55 });
   const gold = new THREE.Color(0xffd100);
 
   const playIntro = !reducedMotion && Boolean(opening);
@@ -209,9 +213,9 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
   function homePose() {
     const mobile = isMobile();
     const target = new THREE.Vector3(0, 0, 0.2);
-    const phi = rad(mobile ? 54 : 69);
+    const phi = rad(mobile ? 54 : 66);
     const theta = rad(mobile ? -16 : -24);
-    const pad = mobile ? { top: 12, side: 8, bottom: 56 } : { top: height * 0.42, side: 60, bottom: 64 };
+    const pad = mobile ? { top: 12, side: 8, bottom: 56 } : { top: height * 0.33, side: 60, bottom: 64 };
     const x0 = insets.left + pad.side;
     const x1 = width - pad.side;
     const y0 = insets.top + pad.top;
@@ -664,7 +668,7 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
   };
 }
 
-function buildBoard(renderer) {
+function buildBoard(renderer, reflections) {
   const group = new THREE.Group();
 
   const c = document.createElement('canvas');
@@ -692,7 +696,7 @@ function buildBoard(renderer) {
 
   const top = new THREE.Mesh(
     new THREE.PlaneGeometry(8, 8).rotateX(-Math.PI / 2),
-    new THREE.MeshPhysicalMaterial({ map, roughness: 0.38, clearcoat: 0.35, clearcoatRoughness: 0.3 }),
+    new THREE.MeshPhysicalMaterial({ map, roughness: 0.38, clearcoat: 0.35, clearcoatRoughness: 0.3, envMap: reflections, envMapIntensity: 0.25 }),
   );
   top.receiveShadow = true;
   group.add(top);
@@ -700,7 +704,7 @@ function buildBoard(renderer) {
   const frameHeight = -TABLE_TOP - 0.002;
   const frame = new THREE.Mesh(
     new THREE.BoxGeometry(8.9, frameHeight, 8.9),
-    new THREE.MeshPhysicalMaterial({ color: 0x06304d, roughness: 0.35, metalness: 0.25, clearcoat: 0.5 }),
+    new THREE.MeshPhysicalMaterial({ color: 0x06304d, roughness: 0.35, metalness: 0.25, clearcoat: 0.5, envMap: reflections, envMapIntensity: 0.3 }),
   );
   frame.position.y = -0.002 - frameHeight / 2;
   frame.castShadow = true;

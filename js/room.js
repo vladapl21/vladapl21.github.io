@@ -126,10 +126,10 @@ function rugTexture() {
 function windowTexture() {
   return canvasTexture(768, 540, (g, w, h) => {
     const sky = g.createLinearGradient(0, 0, 0, h);
-    sky.addColorStop(0, '#0b2a52');
-    sky.addColorStop(0.45, '#2b5d9a');
-    sky.addColorStop(0.72, '#e39a62');
-    sky.addColorStop(0.86, '#f6c873');
+    sky.addColorStop(0, '#061633');
+    sky.addColorStop(0.5, '#15396e');
+    sky.addColorStop(0.78, '#6c5a86');
+    sky.addColorStop(0.9, '#e39a62');
     sky.addColorStop(1, '#f1b25c');
     g.fillStyle = sky;
     g.fillRect(0, 0, w, h);
@@ -138,6 +138,16 @@ function windowTexture() {
       g.fillStyle = `rgba(255,255,255,${0.2 + rand() * 0.6})`;
       g.fillRect(rand() * w, rand() * h * 0.4, 1.6, 1.6);
     }
+    // the moon, for the summer spent on a lunar laser link
+    const glow = g.createRadialGradient(560, 120, 10, 560, 120, 90);
+    glow.addColorStop(0, 'rgba(255,255,240,0.5)');
+    glow.addColorStop(1, 'rgba(255,255,240,0)');
+    g.fillStyle = glow;
+    g.fillRect(440, 0, 240, 240);
+    g.fillStyle = '#fbf6e2';
+    g.beginPath(); g.arc(560, 120, 30, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(190,185,165,0.55)';
+    for (const [mx, my, mr] of [[550, 110, 7], [572, 128, 5], [556, 134, 4], [570, 106, 3]]) { g.beginPath(); g.arc(mx, my, mr, 0, Math.PI * 2); g.fill(); }
     g.fillStyle = '#071521';
     // far hills and rooftops
     g.beginPath();
@@ -214,11 +224,15 @@ function coffeeTable() {
   return g;
 }
 
-function tableThings() {
-  const g = new THREE.Group();
-  const y = TABLE_TOP;
+function mesh(geometry, material, x, y, z, cast = true) {
+  const m = new THREE.Mesh(geometry, material);
+  m.position.set(x, y, z);
+  m.castShadow = cast;
+  m.receiveShadow = true;
+  return m;
+}
 
-  // mug
+function mugOfCoffee() {
   const ceramic = mat(0xf1ece0, 0.35);
   const mug = new THREE.Group();
   const body = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.55, 1.35, 28, 1, true), new THREE.MeshStandardMaterial({ color: 0xf1ece0, roughness: 0.35, side: THREE.DoubleSide }));
@@ -232,25 +246,14 @@ function tableThings() {
   handle.position.set(0.6, 0.7, 0);
   mug.add(body, base, coffee, handle);
   mug.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-  mug.position.set(-9.6, y, 3.4);
-  mug.rotation.y = 2.4;
-  g.add(mug);
+  return mug;
+}
 
-  // two books, the top one in gold
-  const pages = mat(0xe9e2d0, 0.9);
-  const b1 = box(5.2, 0.7, 3.7, mat(0x0b2b47, 0.6), -10.6, y + 0.35, -4.6, { cast: true });
-  b1.rotation.y = 0.18;
-  const p1 = box(5.0, 0.5, 3.5, pages, -10.54, y + 0.35, -4.56);
-  p1.rotation.y = 0.18;
-  const b2 = box(4.4, 0.55, 3.2, mat(0xd7a91a, 0.55), -10.8, y + 0.98, -4.7, { cast: true });
-  b2.rotation.y = -0.12;
-  g.add(b1, p1, b2);
-
-  // chess clock
+function chessClock() {
   const clock = new THREE.Group();
   clock.add(box(4.6, 2.3, 1.7, mat(0x2a1a10, 0.45), 0, 1.15, 0, { round: 0.15, cast: true }));
   for (const x of [-1.12, 1.12]) {
-    const face = new THREE.Mesh(new THREE.CylinderGeometry(0.86, 0.86, 0.06, 32).rotateX(Math.PI / 2), mat(0xf4efe3, 0.4));
+    const face = new THREE.Mesh(new THREE.CylinderGeometry(0.86, 0.86, 0.06, 32).rotateX(Math.PI / 2), mat(0x9a9488, 0.55));
     face.position.set(x, 1.2, 0.87);
     const hand = box(0.06, 0.62, 0.03, mat(0x111111, 0.5), x + 0.12, 1.42, 0.91);
     hand.rotation.z = -0.5;
@@ -260,10 +263,283 @@ function tableThings() {
     button.position.set(x, 2.3 + (x < 0 ? 0.25 : 0.12), 0);
     clock.add(face, hand, hand2, button);
   }
-  clock.position.set(10.4, y, -4.6);
-  clock.rotation.y = -0.5;
-  g.add(clock);
+  return clock;
+}
 
+// Eggs Benedict: two muffin halves, ham, poached eggs, hollandaise, chives.
+function eggsBenedict() {
+  const g = new THREE.Group();
+  g.add(mesh(new THREE.CylinderGeometry(2.5, 1.9, 0.16, 40), mat(0xf4f1ea, 0.3), 0, 0.08, 0));
+  const rim = mesh(new THREE.TorusGeometry(2.42, 0.07, 8, 48).rotateX(Math.PI / 2), mat(0xf4f1ea, 0.3), 0, 0.17, 0, false);
+  g.add(rim);
+  const rand = rng(31);
+  for (const [x, z] of [[-0.85, 0.15], [0.9, -0.25]]) {
+    g.add(mesh(new THREE.CylinderGeometry(0.82, 0.86, 0.34, 24), mat(0xc79a5b, 0.9), x, 0.33, z));
+    g.add(mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.08, 24), mat(0xd9848a, 0.7), x, 0.54, z));
+    const egg = mesh(new THREE.SphereGeometry(0.74, 24, 16), mat(0xfbf8f0, 0.35), x, 0.78, z);
+    egg.scale.y = 0.56;
+    g.add(egg);
+    const sauce = mesh(new THREE.SphereGeometry(0.6, 24, 16), mat(0xf2c12e, 0.3), x + 0.04, 0.98, z);
+    sauce.scale.set(1, 0.38, 0.92);
+    g.add(sauce);
+    const drip = mesh(new THREE.SphereGeometry(0.3, 14, 10), mat(0xf2c12e, 0.3), x + 0.5, 0.74, z + 0.36);
+    drip.scale.set(0.8, 1.1, 0.7);
+    g.add(drip);
+    for (let k = 0; k < 7; k++) {
+      const a = rand() * Math.PI * 2;
+      const r = rand() * 0.42;
+      const chive = mesh(new THREE.BoxGeometry(0.13, 0.03, 0.05), mat(0x3f8a3c, 0.8), x + Math.cos(a) * r, 1.21 - r * 0.12, z + Math.sin(a) * r, false);
+      chive.rotation.y = rand() * 3;
+      g.add(chive);
+    }
+  }
+  // fork
+  const steel = mat(0xcfd3d6, 0.25, { metalness: 0.9 });
+  const fork = new THREE.Group();
+  fork.add(mesh(new THREE.BoxGeometry(0.16, 0.05, 2.4), steel, 0, 0.03, 0.6));
+  fork.add(mesh(new THREE.BoxGeometry(0.46, 0.05, 0.5), steel, 0, 0.03, -0.8));
+  for (const tx of [-0.18, -0.06, 0.06, 0.18]) fork.add(mesh(new THREE.BoxGeometry(0.06, 0.05, 0.9), steel, tx, 0.03, -1.45));
+  fork.position.set(3.1, 0, 0.3);
+  fork.rotation.y = 0.2;
+  g.add(fork);
+  return g;
+}
+
+function cardTexture(rank) {
+  return canvasTexture(160, 230, (g, w, h) => {
+    g.fillStyle = '#fbf9f2';
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = '#10151c';
+    g.font = '700 54px Georgia, serif';
+    g.textAlign = 'center';
+    g.fillText(rank, 30, 54);
+    g.font = '40px Georgia, serif';
+    g.fillText('♠', 30, 92);
+    g.font = '110px Georgia, serif';
+    g.fillText('♠', w / 2, h / 2 + 40);
+  });
+}
+
+// Poker: a stack of chips, a couple loose, and ace-king of spades.
+function pokerHand() {
+  const g = new THREE.Group();
+  const chip = new THREE.CylinderGeometry(0.56, 0.56, 0.1, 28);
+  const colors = [0x2774ae, 0xf4f1ea, 0xd7a91a, 0x10151c, 0x2774ae, 0xd7a91a, 0xf4f1ea, 0x2774ae, 0x10151c];
+  colors.forEach((c, i) => g.add(mesh(chip, mat(c, 0.5), 0.02 * Math.sin(i * 2.1), 0.05 + i * 0.102, 0.02 * Math.cos(i * 1.7))));
+  g.add(mesh(chip, mat(0xd7a91a, 0.5), 1.35, 0.05, 0.5));
+  const leaning = mesh(chip, mat(0x2774ae, 0.5), 0.72, 0.2, 0.25);
+  leaning.rotation.z = -0.5;
+  g.add(leaning);
+  const back = mat(0xfbf9f2, 0.6);
+  ['A', 'K'].forEach((rank, i) => {
+    const card = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.02, 2.45), [back, back, new THREE.MeshStandardMaterial({ map: cardTexture(rank), roughness: 0.6 }), back, back, back]);
+    card.position.set(-2.3 + i * 0.75, 0.02 + i * 0.022, 0.5 - i * 0.2);
+    card.rotation.y = 0.5 - i * 0.42;
+    card.receiveShadow = true;
+    g.add(card);
+  });
+  return g;
+}
+
+function shuttlecock() {
+  const g = new THREE.Group();
+  const cork = mesh(new THREE.SphereGeometry(0.26, 16, 12), mat(0xf4f1ea, 0.5), 0, 0, 0);
+  const band = mesh(new THREE.CylinderGeometry(0.265, 0.265, 0.07, 16), mat(0x2774ae, 0.5), 0, 0.14, 0, false);
+  const skirt = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.72, 0.24, 0.95, 16, 1, true),
+    new THREE.MeshStandardMaterial({ color: 0xfbfaf5, roughness: 0.7, side: THREE.DoubleSide, transparent: true, opacity: 0.9 }),
+  );
+  skirt.position.y = 0.62;
+  skirt.castShadow = true;
+  g.add(cork, band, skirt);
+  return g;
+}
+
+// A small open-wheel racing car, the kind you keep on a shelf.
+function raceCar() {
+  const g = new THREE.Group();
+  const red = mat(0xc8201f, 0.35, { metalness: 0.2 });
+  const black = mat(0x111214, 0.6);
+  g.add(mesh(new THREE.BoxGeometry(0.8, 0.34, 2.4), red, 0, 0.36, 0.1));
+  const nose = mesh(new THREE.CylinderGeometry(0.08, 0.36, 1.6, 4).rotateX(-Math.PI / 2).rotateZ(Math.PI / 4), red, 0, 0.32, -1.85);
+  nose.scale.y = 0.6;
+  g.add(nose);
+  g.add(mesh(new THREE.BoxGeometry(0.46, 0.3, 0.7), black, 0, 0.62, 0.15));
+  g.add(mesh(new THREE.BoxGeometry(0.5, 0.42, 0.5), red, 0, 0.72, 0.85));
+  g.add(mesh(new THREE.BoxGeometry(2.0, 0.06, 0.42), black, 0, 0.2, -2.5));
+  g.add(mesh(new THREE.BoxGeometry(1.7, 0.07, 0.5), black, 0, 0.92, 1.45));
+  for (const sx of [-0.78, 0.78]) g.add(mesh(new THREE.BoxGeometry(0.06, 0.5, 0.5), black, sx, 0.72, 1.45));
+  const wheel = new THREE.CylinderGeometry(0.34, 0.34, 0.34, 20).rotateZ(Math.PI / 2);
+  for (const [x, z] of [[-0.8, -1.5], [0.8, -1.5], [-0.84, 1.05], [0.84, 1.05]]) g.add(mesh(wheel, black, x, 0.34, z));
+  return g;
+}
+
+function golfBalls() {
+  const g = new THREE.Group();
+  const bowl = new THREE.Mesh(
+    new THREE.SphereGeometry(1.5, 28, 14, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: 0x24170e, roughness: 0.5, side: THREE.DoubleSide }),
+  );
+  bowl.scale.y = 0.62;
+  bowl.position.y = 0.94;
+  bowl.castShadow = true;
+  g.add(bowl);
+  const ball = new THREE.SphereGeometry(0.4, 16, 12);
+  const white = mat(0xf7f6f1, 0.45);
+  for (const [x, y, z] of [[-0.5, 0.48, 0.2], [0.42, 0.5, -0.3], [0.1, 0.5, 0.62], [-0.2, 0.52, -0.55], [0.05, 1.05, 0.05]]) g.add(mesh(ball, white, x, y, z));
+  g.add(mesh(ball, white, 2.4, 0.4, 0.9));
+  return g;
+}
+
+function tableThings() {
+  const g = new THREE.Group();
+  const y = TABLE_TOP;
+  const put = (thing, x, z, ry = 0) => {
+    thing.position.set(x, y, z);
+    thing.rotation.y = ry;
+    g.add(thing);
+    return thing;
+  };
+
+  // left of the board: breakfast, coffee, books with a model car on top
+  put(eggsBenedict(), -9.8, 4.4, 0.3);
+  put(mugOfCoffee(), -6.4, 7.2, 2.2);
+  const pages = mat(0xe9e2d0, 0.9);
+  const books = new THREE.Group();
+  books.add(box(5.2, 0.7, 3.7, mat(0x0b2b47, 0.6), 0, 0.35, 0, { cast: true }));
+  books.add(box(5.0, 0.5, 3.5, pages, 0.06, 0.35, 0.04));
+  const topBook = box(4.4, 0.55, 3.2, mat(0xd7a91a, 0.55), -0.2, 0.98, -0.1, { cast: true });
+  topBook.rotation.y = -0.25;
+  books.add(topBook);
+  const car = raceCar();
+  car.position.set(-0.2, 1.26, -0.1);
+  car.rotation.y = 1.15;
+  car.scale.setScalar(0.92);
+  books.add(car);
+  put(books, -10.6, -4.8, 0.18);
+
+  // right of the board: the clock, a poker hand, a shuttlecock, golf balls
+  put(chessClock(), 11.6, -7.0, -0.55);
+  put(pokerHand(), 10.6, 4.6, -0.2);
+  const birdie = put(shuttlecock(), 7.0, 7.6, 0.4);
+  birdie.rotation.z = 1.25;
+  birdie.position.y = y + 0.5;
+  put(golfBalls(), 12.6, 0.2, 0.6);
+
+  return g;
+}
+
+// ---------- things on the walls and around the room ----------
+
+// A felt pennant in the school's colours. Plain lettering, not the university's logo.
+function pennant() {
+  const tex = canvasTexture(1024, 400, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    g.beginPath();
+    g.moveTo(8, 8); g.lineTo(w - 8, h / 2); g.lineTo(8, h - 8); g.closePath();
+    g.fillStyle = '#2774ae';
+    g.fill();
+    g.save();
+    g.clip();
+    g.fillStyle = '#ffd100';
+    g.fillRect(8, 0, 44, h);
+    g.fillRect(70, 0, 10, h);
+    g.restore();
+    g.fillStyle = '#ffd100';
+    g.font = '800 170px "Sofia Sans Extra Condensed", "Arial Narrow", Impact, sans-serif';
+    g.textBaseline = 'middle';
+    g.fillText('UCLA', 118, h / 2 + 8);
+  });
+  const m = new THREE.Mesh(
+    new THREE.PlaneGeometry(21, 8.2),
+    new THREE.MeshStandardMaterial({ map: tex, transparent: true, alphaTest: 0.4, roughness: 1 }),
+  );
+  return m;
+}
+
+function dartboard() {
+  const tex = canvasTexture(512, 512, (g, w) => {
+    const c = w / 2;
+    g.fillStyle = '#0e0f11';
+    g.beginPath(); g.arc(c, c, c, 0, Math.PI * 2); g.fill();
+    const ring = (r0, r1, colors) => {
+      for (let i = 0; i < 20; i++) {
+        const a0 = ((i - 0.5) / 20) * Math.PI * 2 - Math.PI / 2;
+        const a1 = ((i + 0.5) / 20) * Math.PI * 2 - Math.PI / 2;
+        g.beginPath();
+        g.arc(c, c, r1, a0, a1);
+        g.arc(c, c, r0, a1, a0, true);
+        g.closePath();
+        g.fillStyle = colors[i % 2];
+        g.fill();
+      }
+    };
+    ring(16, 206, ['#15171a', '#e9dfc4']);
+    ring(196, 206, ['#b3261e', '#1f7a3f']);
+    ring(118, 128, ['#b3261e', '#1f7a3f']);
+    g.fillStyle = '#1f7a3f'; g.beginPath(); g.arc(c, c, 16, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#b3261e'; g.beginPath(); g.arc(c, c, 7, 0, Math.PI * 2); g.fill();
+  });
+  const g = new THREE.Group();
+  const face = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9 });
+  const side = mat(0x0e0f11, 0.8);
+  const board = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 0.7, 48).rotateX(Math.PI / 2), [side, face, side]);
+  g.add(board);
+  // three darts, one in the bullseye
+  for (const [x, y, c] of [[0.05, 0.1, 0xd7a91a], [1.5, 2.9, 0x2774ae], [-2.2, 0.9, 0x2774ae]]) {
+    const dart = new THREE.Group();
+    dart.add(mesh(new THREE.CylinderGeometry(0.07, 0.03, 1.5, 8).rotateX(Math.PI / 2), mat(0x9aa0a6, 0.3, { metalness: 0.8 }), 0, 0, 0.9, false));
+    dart.add(mesh(new THREE.BoxGeometry(0.02, 0.7, 0.6), mat(c, 0.7), 0, 0, 1.75, false));
+    dart.add(mesh(new THREE.BoxGeometry(0.7, 0.02, 0.6), mat(c, 0.7), 0, 0, 1.75, false));
+    dart.position.set(x, y, 0.2);
+    dart.rotation.set(-0.12, 0.1 * x, 0);
+    g.add(dart);
+  }
+  return g;
+}
+
+// Skis and poles propped in the corner.
+function skis() {
+  const g = new THREE.Group();
+  const base = mat(0x0b2b47, 0.4);
+  const top = mat(0xd7a91a, 0.4);
+  for (const dx of [0, 1.6]) {
+    const ski = new THREE.Group();
+    ski.add(box(1.3, 30, 0.22, base, 0, 15, 0));
+    ski.add(box(1.3, 12, 0.24, top, 0, 21, 0.01));
+    const tip = box(1.3, 2.2, 0.22, base, 0, 30.8, 0.35);
+    tip.rotation.x = 0.5;
+    ski.add(tip);
+    ski.position.x = dx;
+    ski.rotation.z = dx ? -0.03 : 0.02;
+    g.add(ski);
+  }
+  const pole = mat(0x9aa0a6, 0.3, { metalness: 0.8 });
+  for (const dx of [3.6, 4.3]) {
+    g.add(mesh(new THREE.CylinderGeometry(0.1, 0.1, 22, 8), pole, dx, 11, 0.4, false));
+    g.add(mesh(new THREE.CylinderGeometry(0.16, 0.16, 2.6, 8), mat(0x111214, 0.8), dx, 21.2, 0.4, false));
+    g.add(mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.06, 16), mat(0x111214, 0.8), dx, 1.4, 0.4, false));
+  }
+  g.rotation.x = -0.13;
+  return g;
+}
+
+function badmintonRacket() {
+  const g = new THREE.Group();
+  const frame = mat(0x10151c, 0.4);
+  const head = new THREE.Mesh(new THREE.TorusGeometry(2.0, 0.09, 8, 40), frame);
+  head.scale.set(0.82, 1.1, 1);
+  head.position.y = 7.6;
+  g.add(head);
+  const strings = new THREE.Mesh(
+    new THREE.CircleGeometry(2.0, 32),
+    new THREE.MeshStandardMaterial({ color: 0xf4f1ea, roughness: 0.9, transparent: true, opacity: 0.22, side: THREE.DoubleSide }),
+  );
+  strings.scale.set(0.82, 1.1, 1);
+  strings.position.y = 7.6;
+  g.add(strings);
+  g.add(mesh(new THREE.CylinderGeometry(0.07, 0.07, 3.6, 8), frame, 0, 3.6, 0, false));
+  g.add(mesh(new THREE.CylinderGeometry(0.17, 0.17, 2.4, 10), mat(0x2774ae, 0.8), 0, 0.9, 0, false));
   return g;
 }
 
@@ -304,12 +580,12 @@ function floorLamp(x, z) {
   pole.position.y = FLOOR + 13.5;
   const shade = new THREE.Mesh(
     new THREE.CylinderGeometry(3.1, 4.4, 5.6, 36, 1, true),
-    new THREE.MeshStandardMaterial({ color: 0xffe2b0, emissive: 0xffb45e, emissiveIntensity: 1.5, roughness: 0.9, side: THREE.DoubleSide }),
+    new THREE.MeshStandardMaterial({ color: 0xffe2b0, emissive: 0xffa24a, emissiveIntensity: 0.75, roughness: 0.9, side: THREE.DoubleSide }),
   );
   shade.position.y = FLOOR + 28.5;
   g.add(base, pole, shade);
   g.position.set(x, 0, z);
-  const light = new THREE.PointLight(0xffb060, 1500, 120, 1.8);
+  const light = new THREE.PointLight(0xffa552, 330, 110, 1.8);
   light.position.set(x, FLOOR + 27, z);
   g.userData.light = light;
   return g;
@@ -418,7 +694,7 @@ export function buildRoom() {
   room.add(rug);
 
   // walls and baseboards
-  const wall = mat(0x1d4460, 0.95);
+  const wall = mat(0x143246, 0.95);
   const trim = mat(0xe6dfd0, 0.7);
   const walls = [
     [width, cx, back, 0],
@@ -442,7 +718,7 @@ export function buildRoom() {
   const winW = 40;
   const winH = 25;
   const winY = FLOOR + 18 + winH / 2;
-  const view = new THREE.Mesh(new THREE.PlaneGeometry(winW, winH), new THREE.MeshBasicMaterial({ map: windowTexture(), toneMapped: false }));
+  const view = new THREE.Mesh(new THREE.PlaneGeometry(winW, winH), new THREE.MeshBasicMaterial({ map: windowTexture(), color: 0x8a8a8a, toneMapped: false }));
   view.position.set(0, winY, back + 0.1);
   room.add(view);
   const frame = mat(0xefe9dc, 0.6);
@@ -455,7 +731,7 @@ export function buildRoom() {
   room.add(box(winW + 24, 0.6, 0.6, mat(0x1a1a1a, 0.4, { metalness: 0.6 }), 0, FLOOR + 45, back + 1.4));
 
   // sofa with pillows, facing the table
-  const couch = sofa({ width: 44, color: 0xb7ada0, seats: 3 });
+  const couch = sofa({ width: 44, color: 0x56616c, seats: 3 });
   couch.position.set(0, 0, -25);
   room.add(couch);
   room.add(pillow(0xd7a91a, -14.6, FLOOR + 11.2, -25.2, 0.35, 0.12));
@@ -484,16 +760,29 @@ export function buildRoom() {
   const a2 = framedArt(1, 13, 16);
   a2.position.set(left + 0.4, FLOOR + 27, 2);
   a2.rotation.y = Math.PI / 2;
-  const a3 = framedArt(1, 10, 12.5);
-  a3.position.set(-44, FLOOR + 30, back + 0.4);
-  room.add(a1, a2, a3);
+  room.add(a1, a2);
+
+  // easter eggs around the room
+  const darts = dartboard();
+  darts.position.set(-45, FLOOR + 31, back + 0.4);
+  room.add(darts);
+  const flag = pennant();
+  flag.position.set(44.5, FLOOR + 33, back + 0.25);
+  room.add(flag);
+  const skiSet = skis();
+  skiSet.position.set(left + 6, FLOOR, back + 5.2);
+  room.add(skiSet);
+  const racket = badmintonRacket();
+  racket.position.set(12.5, FLOOR + 8.5, -20.5);
+  racket.rotation.set(-1.32, 0, 0.5);
+  room.add(racket);
 
   // the table the board stands on
   room.add(coffeeTable(), tableThings());
   room.add(blob(44, 30, 0, 0, 0.45));
 
   // cool light from the window, to rim the pieces and the sofa
-  const dusk = new THREE.PointLight(0x7fb0e6, 900, 140, 1.7);
+  const dusk = new THREE.PointLight(0x7fb0e6, 240, 140, 1.7);
   dusk.position.set(0, winY, back + 6);
   room.add(dusk);
 
