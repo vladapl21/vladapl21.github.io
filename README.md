@@ -31,7 +31,7 @@ Then go to http://localhost:8000. Opening `index.html` straight from disk will n
 
 ## Deploying
 
-GitHub Pages serves the `main` branch as it is. Push to `main` and the site updates.
+There is nothing to build. GitHub Pages serves the `main` branch as it is, and `netlify.toml` tells Netlify to do the same (publish the repo root, no build command). Once the repo is linked to a Netlify site, every push to `main` updates both.
 
 ## Easter eggs
 

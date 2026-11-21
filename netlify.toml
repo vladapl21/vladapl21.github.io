@@ -1,0 +1,10 @@
+# Netlify: this is a plain static site. Nothing to build; serve the repo as it is.
+[build]
+  publish = "."
+  command = ""
+
+# Let browsers keep the big, rarely-changing files, but always re-check the page and scripts.
+[[headers]]
+  for = "/fonts/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
