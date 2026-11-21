@@ -1,49 +1,72 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Vlad Plyushchenko</title>
-  <link rel="shortcut icon" href="profile-picture-for-web-modified.png" type="image/x-icon">
-  <link rel="stylesheet" href="app.css">
-  <script src="app.js"></script>
+  <meta name="description" content="Vlad Plyushchenko studies computer science at UCLA. His experience and projects, laid out on a chessboard.">
+  <meta property="og:title" content="Vlad Plyushchenko">
+  <meta property="og:description" content="Computer science at UCLA, class of 2028. My experience and projects, laid out on a chessboard.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://vladapl21.github.io/">
+  <meta property="og:image" content="https://vladapl21.github.io/img/preview.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="theme-color" content="#021C2E">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="fonts/sofia-sans.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/sofia-sans-extra-condensed.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="modulepreload" href="vendor/three.js">
+  <link rel="stylesheet" href="css/site.css">
 </head>
-<body>
-  <mobile style="position: absolute; top: 7%; left: 24%;">
-    <p><a href="https://github.com/vladapl21"><img src="github-dark.svg" alt="This is my image." height="50"></a></p>
-  </mobile>
-  <mobile style="position: absolute; top: 7%; left: 44%;">
-    <p><a href="https://www.instagram.com/vlad.apl" target="_blank"><img src="instagram-white-icon.svg" alt="Instagram" height="50"></a></p>
-  </mobile>
-  <mobile style="position: absolute; top: 7%; left: 62.5%;">
-    <p><a href="https://www.linkedin.com/in/vladplyushchenko"><img src="linkedin-dark.svg" alt="LinkedIn" height="53"></a></p>
-  </mobile>
+<body data-mode="board">
+  <canvas id="scene" aria-hidden="true"></canvas>
+  <div id="overlay" aria-hidden="true"></div>
+  <div class="scrim" aria-hidden="true"></div>
 
-  <main style="position: absolute; top: 3%; left: 74%;">
-    <p><a href="mailto:vladplyu@gmail.com" target="_blank">Contact Me</a></p>
-  </main>
-  <main style="position: absolute; top: 4%; left: 84%;">
-    <a href="https://www.instagram.com/vlad.apl" target="_blank"><img src="instagram-white-icon.svg" alt="Instagram" height="50"></a>
-  </main>
-  <main style="position: absolute; top: 4%; left: 89%;">
-    <a href="https://github.com/vladapl21" target="_blank"><img src="github-dark.svg" alt="GitHub" height="50"></a>
-  </main>
-  <main style="position: absolute; top: 4%; left: 93.5%;">
-    <a href="https://www.linkedin.com/in/vladplyushchenko" target="_blank"><img src="linkedin-dark.svg" alt="LinkedIn" height="53"></a>
-  </main>
-  <header>
-    <h3>Hi, my name is</h3>
-    <h1>Vlad Plyushchenko.</h1>
-    <div class="horizontal-line"></div>
-    <h2>I'm a UCLA first-year Computer Science student with a background in business and technology. </h2>
-    <h2>Previously, I studied at Harrow School in the UK - completing full GCSE and A-level programs</h2>
-    <h2>to the highest level available. I hope to further explore the intersection of technology and</h2>
-    <h2>business throughout my studies in he US under guidance of organizations and clubs.</h2>
-    <h4>I'm a London student with an academic background in business and technology.</h4>
-    <h4>Currently, I'm researching innovation in the data management and privacy sector.</h4>
-    <h4>I hope to further explore the field of technological entrepreneurship when I move to the US for university this upcoming year.</h4>
-    <audio controls autoplay><source src="Myuu-Fading.mp3"></audio>
+  <header class="mast">
+    <h1><span>Vlad</span> <span>Plyushchenko</span></h1>
+    <p>Computer science at UCLA, class of 2028</p>
   </header>
+
+  <nav class="links" aria-label="Elsewhere">
+    <a href="https://github.com/vladapl21" target="_blank" rel="noopener">GitHub</a>
+    <a href="https://www.linkedin.com/in/vladplyushchenko/" target="_blank" rel="noopener">LinkedIn</a>
+    <a href="mailto:vladplyu@gmail.com">Email</a>
+    <a class="button to-plain" href="#plain">Read as a plain page</a>
+    <a class="button to-board" href="#">Back to the board</a>
+  </nav>
+
+  <nav class="index" id="index" aria-label="Sections"></nav>
+
+  <aside class="panel" id="panel" aria-labelledby="panel-title" tabindex="-1" inert></aside>
+
+  <p class="hint" id="hint">Each white piece is a part of my work. Pick one.</p>
+  <p class="status" aria-hidden="true"><span>Italian Game</span><span>16 pieces tracked</span><span id="fps"></span></p>
+
+  <main id="plain" hidden>
+    <p class="no-board-note">The 3D board needs WebGL, which is turned off in this browser. Everything on it is on this page.</p>
+    <div id="plain-body"></div>
+    <footer class="plain-foot">
+      <p>© <span id="year">2026</span> <span id="name">Vlad Plyushchenko</span></p>
+    </footer>
+  </main>
+
+  <dialog id="demo" aria-labelledby="demo-title">
+    <header>
+      <h2 id="demo-title"></h2>
+      <a id="demo-tab" href="#" target="_blank" rel="noopener">Open in a new tab</a>
+      <button id="demo-close" type="button">Close</button>
+    </header>
+    <iframe id="demo-frame" title="Live demo" src="about:blank"></iframe>
+  </dialog>
+
+  <noscript>
+    <div class="noscript">
+      <p>This page draws my experience and projects on a 3D chessboard, which needs JavaScript. Without it, you can find me here:</p>
+      <p><a href="https://github.com/vladapl21">GitHub</a>, <a href="https://www.linkedin.com/in/vladplyushchenko/">LinkedIn</a>, <a href="mailto:vladplyu@gmail.com">vladplyu@gmail.com</a></p>
+    </div>
+  </noscript>
+
+  <script type="module" src="js/main.js"></script>
 </body>
 </html>
-
