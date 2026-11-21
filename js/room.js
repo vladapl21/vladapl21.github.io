@@ -447,30 +447,87 @@ function tableThings() {
 
 // ---------- things on the walls and around the room ----------
 
-// A felt pennant in the school's colours. Plain lettering, not the university's logo.
-function pennant() {
-  const tex = canvasTexture(1024, 400, (g, w, h) => {
-    g.clearRect(0, 0, w, h);
-    g.beginPath();
-    g.moveTo(8, 8); g.lineTo(w - 8, h / 2); g.lineTo(8, h - 8); g.closePath();
-    g.fillStyle = '#2774ae';
-    g.fill();
-    g.save();
-    g.clip();
-    g.fillStyle = '#ffd100';
-    g.fillRect(8, 0, 44, h);
-    g.fillRect(70, 0, 10, h);
-    g.restore();
-    g.fillStyle = '#ffd100';
-    g.font = '800 170px "Sofia Sans Extra Condensed", "Arial Narrow", Impact, sans-serif';
-    g.textBaseline = 'middle';
-    g.fillText('UCLA', 118, h / 2 + 8);
+// Letters set along an arc, the way they are sewn on a felt college banner:
+// a dark drop shadow, a cream outline, and a gold face that deepens downwards.
+function archedText(c, text, cx, baseY, radius, size) {
+  c.font = `700 ${size}px Georgia, 'Times New Roman', 'Noto Serif', serif`;
+  c.textAlign = 'center';
+  c.textBaseline = 'alphabetic';
+  c.lineJoin = 'round';
+  const gap = size * 0.1;
+  const widths = [...text].map((ch) => c.measureText(ch).width);
+  const total = widths.reduce((a, b) => a + b, 0) + gap * (text.length - 1);
+  const centreY = baseY + radius; // centre of the circle the baseline follows
+  let along = -total / 2;
+  [...text].forEach((ch, i) => {
+    const angle = (along + widths[i] / 2) / radius;
+    along += widths[i] + gap;
+    c.save();
+    c.translate(cx + Math.sin(angle) * radius, centreY - Math.cos(angle) * radius);
+    c.rotate(angle);
+    c.fillStyle = '#0d3252';
+    c.fillText(ch, size * 0.035, size * 0.045);
+    c.strokeStyle = '#f6efd9';
+    c.lineWidth = size * 0.075;
+    c.strokeText(ch, 0, 0);
+    const face = c.createLinearGradient(0, -size * 0.75, 0, 0);
+    face.addColorStop(0, '#ffe04a');
+    face.addColorStop(0.55, '#ffd100');
+    face.addColorStop(1, '#e6a400');
+    c.fillStyle = face;
+    c.fillText(ch, 0, 0);
+    c.restore();
   });
-  const m = new THREE.Mesh(
-    new THREE.PlaneGeometry(21, 8.2),
-    new THREE.MeshStandardMaterial({ map: tex, transparent: true, alphaTest: 0.4, roughness: 1 }),
-  );
-  return m;
+}
+
+// A felt banner in the school's colours, draped over the back of the sofa.
+// Plain serif lettering on an arch, not the university's logo.
+// Origin: on the seat, at the foot of the back cushion, facing +z.
+function banner() {
+  const W = 10.6; // width
+  const H = 5.5; // how far it hangs down the front of the cushion
+  const felt = canvasTexture(1024, 532, (c, w, h) => {
+    const base = c.createLinearGradient(0, 0, 0, h);
+    base.addColorStop(0, '#2b7bb8');
+    base.addColorStop(1, '#205f92');
+    c.fillStyle = base;
+    c.fillRect(0, 0, w, h);
+    const rand = rng(41);
+    for (let i = 0; i < 7000; i++) { // felt nap
+      c.fillStyle = `rgba(${rand() < 0.5 ? '255,255,255' : '0,20,40'},${rand() * 0.07})`;
+      c.fillRect(rand() * w, rand() * h, 2, 2);
+    }
+    // gold border, a second fine line inside it
+    c.strokeStyle = '#ffd100';
+    c.lineWidth = 9;
+    c.strokeRect(22, 22, w - 44, h - 44);
+    c.lineWidth = 2.5;
+    c.strokeRect(38, 38, w - 76, h - 76);
+    archedText(c, 'UCLA', w / 2, 318, 640, 232);
+    // a straight line underneath, between two short rules
+    c.font = "700 44px Georgia, 'Times New Roman', 'Noto Serif', serif";
+    c.textAlign = 'center';
+    c.fillStyle = '#f6efd9';
+    const sub = 'L O S   A N G E L E S';
+    c.fillText(sub, w / 2, 430);
+    const half = c.measureText(sub).width / 2;
+    c.fillStyle = '#ffd100';
+    c.fillRect(w / 2 - half - 130, 412, 96, 5);
+    c.fillRect(w / 2 + half + 34, 412, 96, 5);
+  });
+  const face = new THREE.MeshStandardMaterial({ map: felt, roughness: 1, emissive: 0xffffff, emissiveMap: felt, emissiveIntensity: 0.2 });
+  const edge = mat(0x205f92, 1);
+  const g = new THREE.Group();
+  const lean = new THREE.Group();
+  lean.rotation.x = -0.16; // the same lean as the sofa's back cushions
+  const front = new THREE.Mesh(new THREE.BoxGeometry(W, H, 0.14), [edge, edge, edge, edge, face, edge]);
+  front.position.set(0, 0.95 + H / 2, 0.2);
+  front.receiveShadow = true;
+  lean.add(front);
+  // the part folded over the top of the cushion
+  lean.add(box(W, 0.14, 1.5, edge, 0, 0.95 + H + 0.07, 0.2 - 0.68));
+  g.add(lean);
+  return g;
 }
 
 function dartboard() {
@@ -698,78 +755,6 @@ function framedArt(variant, w, h) {
   return g;
 }
 
-// A hoodie tossed on the sofa: the bottom half lies on the seat, the top half
-// leans back against a cushion so the lettering faces the room. Plain letters
-// in the site's own font, not the university's logo.
-// Origin: on the seat, at the foot of the back cushion, facing +z.
-function hoodie() {
-  const g = new THREE.Group();
-  const cloth = mat(0x2774ae, 1);
-  const rib = mat(0x1f5f92, 1);
-  const soft = { round: 0.24 };
-
-  // on the seat: lower body, hem, pocket
-  g.add(box(8.6, 0.5, 4.7, cloth, 0, 0.27, 2.45, soft));
-  g.add(box(8.7, 0.56, 0.7, rib, 0, 0.3, 4.75, soft));
-  g.add(box(5.0, 0.1, 2.3, rib, 0, 0.56, 2.5));
-
-  // leaning on the cushion: chest, shoulders, hood, lettering
-  const up = new THREE.Group();
-  up.rotation.x = -0.16; // the same lean as the sofa's back cushions
-  up.add(box(8.6, 6.3, 0.5, cloth, 0, 3.25, 0.34, soft));
-  const hood = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), cloth);
-  hood.scale.set(2.7, 2.1, 0.75);
-  hood.position.set(0, 6.9, 0.3);
-  up.add(hood);
-  const neck = new THREE.Mesh(new THREE.CircleGeometry(1, 24), mat(0x174a73, 1));
-  neck.scale.set(1.5, 0.85, 1);
-  neck.position.set(0, 6.25, 0.61);
-  up.add(neck);
-  for (const sx of [-1, 1]) {
-    const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.0, 6), mat(0xf4f1ea, 0.9));
-    cord.position.set(sx * 0.55, 4.9, 0.63);
-    cord.rotation.z = sx * 0.06;
-    const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.3, 6), mat(0xd7a91a, 0.5));
-    tip.position.set(sx * 0.61, 3.85, 0.63);
-    up.add(cord, tip);
-  }
-  const letters = canvasTexture(768, 256, (c, w, h) => {
-    c.clearRect(0, 0, w, h);
-    c.fillStyle = '#ffd100';
-    c.font = '800 250px "Sofia Sans Extra Condensed", "Arial Narrow", Impact, sans-serif';
-    c.textAlign = 'center';
-    c.textBaseline = 'middle';
-    c.fillText('UCLA', w / 2, h / 2 + 12);
-  });
-  const print = new THREE.Mesh(
-    new THREE.PlaneGeometry(5.4, 1.8),
-    new THREE.MeshStandardMaterial({ map: letters, transparent: true, alphaTest: 0.35, roughness: 1, emissive: 0xffd100, emissiveMap: letters, emissiveIntensity: 0.3 }),
-  );
-  print.position.set(0, 2.5, 0.6);
-  up.add(print);
-
-  // sleeves: each hangs from a shoulder down to the seat
-  const upperArm = (sx, angle) => {
-    const arm = box(2.1, 6.0, 0.5, cloth, sx * 4.3 + Math.sin(angle) * 2.9, 6.0 - Math.cos(angle) * 2.9, 0.33, soft);
-    arm.rotation.z = angle;
-    return arm;
-  };
-  up.add(upperArm(-1, -0.28), upperArm(1, 0.22));
-  g.add(up);
-
-  // forearms on the seat: the left one out to the side, the right one folded across the front
-  const left = box(2.0, 0.5, 3.9, cloth, -6.0, 0.27, 2.2, soft);
-  left.rotation.y = -0.22;
-  const leftCuff = box(2.06, 0.56, 0.6, rib, -6.42, 0.3, 4.1, soft);
-  leftCuff.rotation.y = -0.22;
-  const right = box(2.0, 0.5, 4.2, cloth, 3.6, 0.93, 2.3, soft);
-  right.rotation.y = 0.95;
-  const rightCuff = box(2.06, 0.56, 0.6, rib, 1.9, 0.96, 3.5, soft);
-  rightCuff.rotation.y = 0.95;
-  g.add(left, leftCuff, right, rightCuff);
-  return g;
-}
-
 // ---------- the room ----------
 
 export function buildRoom() {
@@ -871,15 +856,12 @@ export function buildRoom() {
   const darts = dartboard();
   darts.position.set(-45, FLOOR + 31, back + 0.4);
   room.add(darts);
-  const flag = pennant();
-  flag.position.set(44.5, FLOOR + 33, back + 0.25);
+  const flag = banner();
+  flag.position.set(7.2, SEAT, -26.0);
   room.add(flag);
   const skiSet = skis();
   skiSet.position.set(left + 6, FLOOR, back + 5.2);
   room.add(skiSet);
-  const top = hoodie();
-  top.position.set(6.0, SEAT, -26.0);
-  room.add(top);
   const racket = badmintonRacket();
   racket.position.set(-0.9, SEAT, -20.9);
   racket.rotation.y = 1.36; // lengthways along the seat, well clear of the back cushions
