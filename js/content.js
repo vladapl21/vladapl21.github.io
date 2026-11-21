@@ -1,7 +1,7 @@
 // Everything the site says lives here. Edit this file to change the content;
 // the board, the side panel and the plain page all read from it.
 //
-// Each entry sits on one chess piece. Half the pieces carry a section, spread
+// Each entry sits on one chess piece. About half the pieces carry a section, spread
 // over both colours; the rest are just pieces.
 //   side / from : which piece, named by colour and the square it starts on
 //                 (e.g. white g1 is the king's knight)
@@ -29,7 +29,7 @@ export const pieces = [
     photo: { src: 'img/vlad.jpg', alt: 'Vlad Plyushchenko', tag: 'vlad', conf: 0.97 },
     body: [
       'I study computer science at UCLA with an economics concentration, and I graduate in June 2028. Before Los Angeles I was at Harrow School in London.',
-      'Most of my work so far has been product management close to the engineering: pointing analysis for a 450,000 km laser downlink at Qosmosys, growth at a VC-backed soccer betting app, and data systems at J.P. Morgan.',
+      'Most of my work so far has been product management close to the engineering: pointing analysis for a 450,000 km laser downlink at Qosmosys, and growth at a VC-backed soccer betting app.',
       'I play blitz chess, and the position on this board is the Italian Game, my opening with White. Away from the board it is poker, Formula 1, skiing, darts and eggs Benedict. I speak English and Russian.',
     ],
   },
@@ -85,19 +85,6 @@ export const pieces = [
       'Led a 6-person, cross-functional product and engineering pod to 2x user growth, lifting referral 0.55 to 1.0.',
       'Planned go-to-market for a $10K freeroll tournament on a World Cup timeline, cutting acquisition cost by 35%.',
       'Ran customer interviews across 3 research pods to find unmet needs, projecting a 40% Day-30 retention lift.',
-    ],
-  },
-  {
-    id: 'jpmorgan',
-    side: 'white', from: 'a1',
-    group: 'Experience', tag: 'J.P. Morgan', conf: 0.96,
-    title: 'J.P. Morgan',
-    meta: 'Product Manager, Data Systems (contract)',
-    when: 'Sep to Dec 2025',
-    where: 'Los Angeles, California',
-    bullets: [
-      'Scoped and shipped Python and Tableau dashboards surfacing 500+ live pipelines across 10 partner colleges.',
-      'Consolidated structured input from 30+ recruiters into SQL models, cutting leadership reporting time by 40%.',
     ],
   },
   {

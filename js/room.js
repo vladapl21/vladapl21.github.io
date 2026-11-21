@@ -698,6 +698,78 @@ function framedArt(variant, w, h) {
   return g;
 }
 
+// A hoodie tossed on the sofa: the bottom half lies on the seat, the top half
+// leans back against a cushion so the lettering faces the room. Plain letters
+// in the site's own font, not the university's logo.
+// Origin: on the seat, at the foot of the back cushion, facing +z.
+function hoodie() {
+  const g = new THREE.Group();
+  const cloth = mat(0x2774ae, 1);
+  const rib = mat(0x1f5f92, 1);
+  const soft = { round: 0.24 };
+
+  // on the seat: lower body, hem, pocket
+  g.add(box(8.6, 0.5, 4.7, cloth, 0, 0.27, 2.45, soft));
+  g.add(box(8.7, 0.56, 0.7, rib, 0, 0.3, 4.75, soft));
+  g.add(box(5.0, 0.1, 2.3, rib, 0, 0.56, 2.5));
+
+  // leaning on the cushion: chest, shoulders, hood, lettering
+  const up = new THREE.Group();
+  up.rotation.x = -0.16; // the same lean as the sofa's back cushions
+  up.add(box(8.6, 6.3, 0.5, cloth, 0, 3.25, 0.34, soft));
+  const hood = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), cloth);
+  hood.scale.set(2.7, 2.1, 0.75);
+  hood.position.set(0, 6.9, 0.3);
+  up.add(hood);
+  const neck = new THREE.Mesh(new THREE.CircleGeometry(1, 24), mat(0x174a73, 1));
+  neck.scale.set(1.5, 0.85, 1);
+  neck.position.set(0, 6.25, 0.61);
+  up.add(neck);
+  for (const sx of [-1, 1]) {
+    const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.0, 6), mat(0xf4f1ea, 0.9));
+    cord.position.set(sx * 0.55, 4.9, 0.63);
+    cord.rotation.z = sx * 0.06;
+    const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.3, 6), mat(0xd7a91a, 0.5));
+    tip.position.set(sx * 0.61, 3.85, 0.63);
+    up.add(cord, tip);
+  }
+  const letters = canvasTexture(768, 256, (c, w, h) => {
+    c.clearRect(0, 0, w, h);
+    c.fillStyle = '#ffd100';
+    c.font = '800 250px "Sofia Sans Extra Condensed", "Arial Narrow", Impact, sans-serif';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    c.fillText('UCLA', w / 2, h / 2 + 12);
+  });
+  const print = new THREE.Mesh(
+    new THREE.PlaneGeometry(5.4, 1.8),
+    new THREE.MeshStandardMaterial({ map: letters, transparent: true, alphaTest: 0.35, roughness: 1, emissive: 0xffd100, emissiveMap: letters, emissiveIntensity: 0.3 }),
+  );
+  print.position.set(0, 2.5, 0.6);
+  up.add(print);
+
+  // sleeves: each hangs from a shoulder down to the seat
+  const upperArm = (sx, angle) => {
+    const arm = box(2.1, 6.0, 0.5, cloth, sx * 4.3 + Math.sin(angle) * 2.9, 6.0 - Math.cos(angle) * 2.9, 0.33, soft);
+    arm.rotation.z = angle;
+    return arm;
+  };
+  up.add(upperArm(-1, -0.28), upperArm(1, 0.22));
+  g.add(up);
+
+  // forearms on the seat: the left one out to the side, the right one folded across the front
+  const left = box(2.0, 0.5, 3.9, cloth, -6.0, 0.27, 2.2, soft);
+  left.rotation.y = -0.22;
+  const leftCuff = box(2.06, 0.56, 0.6, rib, -6.42, 0.3, 4.1, soft);
+  leftCuff.rotation.y = -0.22;
+  const right = box(2.0, 0.5, 4.2, cloth, 3.6, 0.93, 2.3, soft);
+  right.rotation.y = 0.95;
+  const rightCuff = box(2.06, 0.56, 0.6, rib, 1.9, 0.96, 3.5, soft);
+  rightCuff.rotation.y = 0.95;
+  g.add(left, leftCuff, right, rightCuff);
+  return g;
+}
+
 // ---------- the room ----------
 
 export function buildRoom() {
@@ -767,8 +839,8 @@ export function buildRoom() {
   couch.position.set(0, 0, -25);
   room.add(couch);
   const SEAT = FLOOR + 8.2; // top of the sofa's seat cushions
-  room.add(pillow(0xd7a91a, -14.4, SEAT, -24.9, 0.22));
-  room.add(pillow(0x2774ae, 14.6, SEAT, -24.9, -0.2));
+  room.add(pillow(0xd7a91a, -15.2, SEAT, -24.9, 0.22));
+  room.add(pillow(0x2774ae, 15.4, SEAT, -24.9, -0.2));
   room.add(blob(54, 24, 0, -25));
 
   // armchair to the right of the sofa, turned towards the table
@@ -805,8 +877,11 @@ export function buildRoom() {
   const skiSet = skis();
   skiSet.position.set(left + 6, FLOOR, back + 5.2);
   room.add(skiSet);
+  const top = hoodie();
+  top.position.set(6.0, SEAT, -26.0);
+  room.add(top);
   const racket = badmintonRacket();
-  racket.position.set(9.6, SEAT, -20.9);
+  racket.position.set(-0.9, SEAT, -20.9);
   racket.rotation.y = 1.36; // lengthways along the seat, well clear of the back cushions
   room.add(racket);
 

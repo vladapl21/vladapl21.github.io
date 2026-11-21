@@ -234,6 +234,7 @@ buildIndex();
 buildPlain();
 $('#name').textContent = person.name;
 $('#year').textContent = new Date().getFullYear();
+$('#tracked').textContent = `${pieces.length} pieces tracked`;
 
 try {
   // The pennant on the wall is drawn with the display font, so wait for it (briefly).

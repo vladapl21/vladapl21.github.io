@@ -35,10 +35,10 @@ There is nothing to build. GitHub Pages serves the `main` branch as it is, and `
 
 ## Easter eggs
 
-The room is dark on purpose, with one lamp on the board. Drag around to find: a UCLA pennant, eggs Benedict, an ace-king of spades with poker chips, a dartboard, skis in the corner, a badminton racket and shuttlecock, a model racing car, a bowl of golf balls, a chess clock, and the moon in the window. They are all built in `js/room.js`.
+The room is dark on purpose, with one lamp on the board. Drag around to find: a UCLA pennant and hoodie, eggs Benedict, an ace-king of spades with poker chips, a dartboard, skis in the corner, a badminton racket and shuttlecock, a model racing car, a bowl of golf balls, a chess clock, and the moon in the window. They are all built in `js/room.js`.
 
 ## Notes
 
 - `#plain` in the address bar shows everything as an ordinary page. Browsers without WebGL get that page automatically.
-- Colours are UCLA blue (`#2774AE`) and gold (`#FFD100`). The pennant spells the name in the site's own font; the site does not use UCLA's logos.
+- Colours are UCLA blue (`#2774AE`) and gold (`#FFD100`). The pennant and hoodie spell the name in the site's own font; the site does not use UCLA's logos.
 - Fonts are Sofia Sans and Sofia Sans Extra Condensed (SIL Open Font License), served from `fonts/`.
