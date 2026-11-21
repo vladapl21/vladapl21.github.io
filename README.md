@@ -1,18 +1,20 @@
 # vladapl21.github.io
 
-My personal site: experience and projects laid out on a 3D chessboard. Each white piece opens a section, and the gold boxes are a detection-style overlay computed from the 3D scene.
+My personal site: experience and projects laid out on a chessboard that stands on a coffee table in a living room. Half the pieces, white and black, open a section; the gold boxes around them are a detection-style overlay computed from the 3D scene. Left alone, the page cycles pop-up labels through the sections, and the camera drifts back home a few seconds after you stop dragging it.
 
 Live at https://vladapl21.github.io/
 
 ## Editing
 
-All of the text lives in `js/content.js`. Each entry is one white piece: change its `title`, `bullets`, `links` and so on there, and the board, the side panel and the plain page all update.
+All of the text lives in `js/content.js`. Each entry sits on one piece, named by colour and starting square (`side: 'black', from: 'd8'` is the black queen). Change its `title`, `bullets`, `links` and so on there, and the board, the side panel and the plain page all update. To move a section to a different piece, change `side` and `from`.
 
 | File | What it does |
 | --- | --- |
 | `js/content.js` | Every word on the site, plus which piece each section sits on |
 | `js/main.js` | Index, side panel, plain page, address-bar routing |
-| `js/board.js` | 3D scene, camera, clicking pieces, detection boxes |
+| `js/board.js` | 3D scene, camera, clicking pieces, detection boxes, idle pop-ups |
+| `js/room.js` | The living room: table, sofa, window, shelves, lamp |
+| `js/chess.js` | The starting position |
 | `js/pieces.js` | Chess piece shapes, generated in code |
 | `css/site.css` | All styling |
 | `vendor/three.js` | three.js, bundled so the site needs no CDN |

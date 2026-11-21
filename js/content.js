@@ -1,10 +1,13 @@
 // Everything the site says lives here. Edit this file to change the content;
 // the board, the side panel and the plain page all read from it.
 //
-// Each entry is one white piece.
-//   from / square : where the piece starts and where it stands after the opening
-//   tag / conf    : the detection label drawn over the piece
-//   group         : heading it sits under in the index and on the plain page
+// Each entry sits on one chess piece. Half the pieces carry a section, spread
+// over both colours; the rest are just pieces.
+//   side / from : which piece, named by colour and the square it starts on
+//                 (e.g. white g1 is the king's knight)
+//   tag / conf  : the detection label drawn over the piece
+//   teaser      : the line shown in the pop-up (falls back to `meta`)
+//   group       : heading it sits under in the index and on the plain page
 
 export const person = {
   name: 'Vlad Plyushchenko',
@@ -19,9 +22,10 @@ export const groups = ['About', 'Experience', 'Projects', 'Leadership and ventur
 export const pieces = [
   {
     id: 'about',
-    type: 'king', from: 'e1', square: 'e1',
+    side: 'white', from: 'e1',
     group: 'About', tag: 'About', conf: 0.99,
     title: 'About me',
+    teaser: 'Who I am',
     photo: { src: 'img/vlad.jpg', alt: 'Vlad Plyushchenko', tag: 'vlad', conf: 0.97 },
     body: [
       'I study computer science at UCLA with an economics concentration, and I graduate in June 2028. Before Los Angeles I was at Harrow School in London.',
@@ -31,9 +35,10 @@ export const pieces = [
   },
   {
     id: 'education',
-    type: 'pawn', from: 'e2', square: 'e4',
+    side: 'white', from: 'e2',
     group: 'About', tag: 'UCLA', conf: 0.98,
     title: 'Education',
+    teaser: 'UCLA, and Harrow before it',
     sections: [
       {
         title: 'University of California, Los Angeles',
@@ -54,7 +59,7 @@ export const pieces = [
 
   {
     id: 'qosmosys',
-    type: 'knight', from: 'g1', square: 'f3',
+    side: 'white', from: 'g1',
     group: 'Experience', tag: 'Qosmosys', conf: 0.97,
     title: 'Qosmosys',
     meta: 'Product Manager Intern, Optical Systems',
@@ -69,7 +74,7 @@ export const pieces = [
   },
   {
     id: 'beautiful-game',
-    type: 'knight', from: 'b1', square: 'b1',
+    side: 'white', from: 'f1',
     group: 'Experience', tag: 'The Beautiful Game', conf: 0.95,
     title: 'The Beautiful Game',
     meta: 'Product Manager',
@@ -84,7 +89,7 @@ export const pieces = [
   },
   {
     id: 'jpmorgan',
-    type: 'rook', from: 'a1', square: 'a1',
+    side: 'white', from: 'a1',
     group: 'Experience', tag: 'J.P. Morgan', conf: 0.96,
     title: 'J.P. Morgan',
     meta: 'Product Manager, Data Systems (contract)',
@@ -97,7 +102,7 @@ export const pieces = [
   },
   {
     id: 'integem',
-    type: 'bishop', from: 'c1', square: 'c1',
+    side: 'white', from: 'c1',
     group: 'Experience', tag: 'Integem', conf: 0.93,
     title: 'Integem',
     meta: 'Associate Product Manager, Technical Programs',
@@ -110,7 +115,7 @@ export const pieces = [
   },
   {
     id: 'andurand',
-    type: 'rook', from: 'h1', square: 'h1',
+    side: 'white', from: 'h1',
     group: 'Experience', tag: 'Andurand Capital', conf: 0.94,
     title: 'Andurand Capital Management',
     meta: 'Analyst, Venture Capital Branch',
@@ -124,7 +129,7 @@ export const pieces = [
 
   {
     id: 'playbook',
-    type: 'queen', from: 'd1', square: 'd1',
+    side: 'black', from: 'd8',
     group: 'Projects', tag: 'Opening Playbook', conf: 0.99,
     title: 'Chess Opening Playbook',
     meta: 'An opening trainer built from my own games',
@@ -147,7 +152,7 @@ export const pieces = [
   },
   {
     id: 'anavue',
-    type: 'bishop', from: 'f1', square: 'c4',
+    side: 'black', from: 'b8',
     group: 'Projects', tag: 'Anavue', conf: 0.96,
     title: 'Anavue',
     meta: 'Store analytics for high-ticket retail',
@@ -155,7 +160,7 @@ export const pieces = [
     note: 'VC-backed',
     stack: 'Python, OpenCV, React, SQL',
     body: [
-      'Software that lets the manager of a shop like a jewellery boutique see how customers move through the store and where they stop. The boxes drawn over the pieces on this board are a nod to it.',
+      'Software that lets the manager of a shop like a jewellery boutique see how customers move through the store and where they stop. The gold boxes drawn over the pieces on this board are a nod to it.',
     ],
     bullets: [
       'Extended open-source object detection into a live-feed overlay, tracking customer paths through retail stores.',
@@ -165,7 +170,7 @@ export const pieces = [
   },
   {
     id: 'odds',
-    type: 'pawn', from: 'a2', square: 'a2',
+    side: 'black', from: 'e7',
     group: 'Projects', tag: 'Odds calibration', conf: 0.92,
     title: 'Odds calibration',
     meta: 'How efficient is the Premier League betting market?',
@@ -177,7 +182,7 @@ export const pieces = [
   },
   {
     id: 'point-ahead',
-    type: 'pawn', from: 'b2', square: 'b2',
+    side: 'black', from: 'a8',
     group: 'Projects', tag: 'Lunar point-ahead', conf: 0.91,
     title: 'Lunar point-ahead model',
     meta: 'Aiming a laser at where the receiver will be',
@@ -189,7 +194,7 @@ export const pieces = [
   },
   {
     id: 'minigolf',
-    type: 'pawn', from: 'c2', square: 'c2',
+    side: 'black', from: 'h8',
     group: 'Projects', tag: 'Minigolf', conf: 0.90,
     title: '3D minigolf',
     meta: 'Built for CS 174A, computer graphics at UCLA',
@@ -201,7 +206,7 @@ export const pieces = [
   },
   {
     id: 'yber',
-    type: 'pawn', from: 'd2', square: 'd2',
+    side: 'black', from: 'f8',
     group: 'Projects', tag: 'YBER', conf: 0.90,
     title: 'YBER',
     meta: 'Boat rentals and marina life in one app',
@@ -214,7 +219,7 @@ export const pieces = [
 
   {
     id: 'delta-sigma-pi',
-    type: 'pawn', from: 'f2', square: 'f2',
+    side: 'white', from: 'g2',
     group: 'Leadership and ventures', tag: 'Delta Sigma Pi', conf: 0.93,
     title: 'Delta Sigma Pi',
     meta: 'Senior Vice President',
@@ -228,7 +233,7 @@ export const pieces = [
   },
   {
     id: 'agency',
-    type: 'pawn', from: 'g2', square: 'g2',
+    side: 'black', from: 'b7',
     group: 'Leadership and ventures', tag: 'Content agency', conf: 0.91,
     title: 'Social media agency',
     meta: 'Founder',
@@ -241,9 +246,10 @@ export const pieces = [
 
   {
     id: 'contact',
-    type: 'pawn', from: 'h2', square: 'h2',
+    side: 'black', from: 'g7',
     group: 'Contact', tag: 'Contact', conf: 0.98,
     title: 'Get in touch',
+    teaser: 'Email, LinkedIn, GitHub',
     body: ['Email is the fastest way to reach me.'],
     links: [
       { label: 'vladplyu@gmail.com', href: 'mailto:vladplyu@gmail.com' },
@@ -254,11 +260,11 @@ export const pieces = [
 ];
 
 // The opening played when the page loads: the Italian Game.
-// White moves name a piece by id; Black moves name the square it starts on.
+// Each move names the square a piece starts on and where it goes.
 export const opening = [
-  { id: 'education', to: 'e4' },
-  { black: 'e7', to: 'e5' },
-  { id: 'qosmosys', to: 'f3', hop: true },
-  { black: 'b8', to: 'c6', hop: true },
-  { id: 'anavue', to: 'c4' },
+  { from: 'e2', to: 'e4' },
+  { from: 'e7', to: 'e5' },
+  { from: 'g1', to: 'f3', hop: true },
+  { from: 'b8', to: 'c6', hop: true },
+  { from: 'f1', to: 'c4' },
 ];

@@ -1,11 +1,13 @@
-// The 3D board: scene, pieces, camera moves, picking, and the detection boxes
-// drawn over the white pieces.
+// The 3D scene: the board and its pieces, the camera, picking, the detection
+// boxes drawn over the pieces that carry a section, and the idle behaviour
+// (a slow drift, plus pop-ups that cycle through the sections).
 
 import * as THREE from '../vendor/three.js';
 import { OrbitControls, RoomEnvironment } from '../vendor/three.js';
 import { buildPiece } from './pieces.js';
+import { buildRoom, TABLE_TOP } from './room.js';
+import { FILES, startPosition } from './chess.js';
 
-const FILES = 'abcdefgh';
 const squarePos = (s) => new THREE.Vector3(FILES.indexOf(s[0]) - 3.5, 0, 3.5 - (Number(s[1]) - 1));
 const rad = THREE.MathUtils.degToRad;
 
@@ -15,22 +17,26 @@ const easeOut = (t) => 1 - Math.pow(1 - t, 3);
 const LIFT = 0.42;
 const KNIGHT_TURN = Math.PI / 4;
 const MOBILE = 1000; // below this width the panel is a bottom sheet
+const IDLE_RETURN = 7000; // ms without touching the camera before it goes home
+const POPUP_EVERY = 2800; // ms between pop-ups while nobody is interacting
 
 export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, insets: firstInsets, anchor, onSelect, onHover, onFps }) {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 1.0;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
 
   const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x081a28);
+  scene.fog = new THREE.Fog(0x081a28, 90, 230);
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-  scene.environmentIntensity = 0.5;
+  scene.environmentIntensity = 0.32;
 
-  const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 200);
+  const camera = new THREE.PerspectiveCamera(32, 1, 0.2, 400);
   const controls = new OrbitControls(camera, canvas);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
@@ -38,75 +44,74 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
   controls.rotateSpeed = 0.6;
   controls.zoomSpeed = 0.7;
   controls.minDistance = 4.5;
-  controls.maxDistance = 60;
+  controls.maxDistance = 46;
   controls.minPolarAngle = 0.2;
-  controls.maxPolarAngle = 1.45;
+  controls.maxPolarAngle = 1.46;
+  // Stay on White's side of the table; the sofa is on the other.
+  controls.minAzimuthAngle = -1.75;
+  controls.maxAzimuthAngle = 1.75;
 
   // ---- lights ----
-  const key = new THREE.DirectionalLight(0xfff0d8, 2.3);
-  key.position.set(-6, 11, 5);
+  const key = new THREE.DirectionalLight(0xffe9c8, 2.4);
+  key.position.set(-9, 22, 10);
   key.castShadow = true;
   key.shadow.mapSize.set(2048, 2048);
-  key.shadow.camera.left = key.shadow.camera.bottom = -8;
-  key.shadow.camera.right = key.shadow.camera.top = 8;
+  key.shadow.camera.left = key.shadow.camera.bottom = -24;
+  key.shadow.camera.right = key.shadow.camera.top = 24;
   key.shadow.camera.near = 1;
-  key.shadow.camera.far = 30;
-  key.shadow.bias = -0.0004;
-  key.shadow.normalBias = 0.02;
-  key.shadow.radius = 4;
+  key.shadow.camera.far = 70;
+  key.shadow.bias = -0.0005;
+  key.shadow.normalBias = 0.03;
+  key.shadow.radius = 5;
   scene.add(key);
-  scene.add(new THREE.HemisphereLight(0x8bb8e8, 0x021c2e, 0.55));
-  const rim = new THREE.DirectionalLight(0x8bb8e8, 1.3);
-  rim.position.set(5, 4, -8);
-  scene.add(rim);
+  scene.add(new THREE.HemisphereLight(0x9fc4ea, 0x3a2a1c, 0.5));
 
-  // ---- board ----
+  scene.add(buildRoom());
   scene.add(buildBoard(renderer));
 
-  // ---- pieces ----
+  // ---- pieces: all 32, some of which carry a section ----
   const ivory = new THREE.MeshPhysicalMaterial({ color: 0xebe3d0, roughness: 0.34, clearcoat: 0.5, clearcoatRoughness: 0.25 });
-  const navy = new THREE.MeshPhysicalMaterial({ color: 0x0b2b47, roughness: 0.28, metalness: 0.15, clearcoat: 0.7, clearcoatRoughness: 0.2 });
+  const navy = new THREE.MeshPhysicalMaterial({ color: 0x0f3355, roughness: 0.28, metalness: 0.15, clearcoat: 0.7, clearcoatRoughness: 0.2 });
   const gold = new THREE.Color(0xffd100);
 
   const playIntro = !reducedMotion && Boolean(opening);
-  const white = []; // { id, group, material, home, corners, el, tagConf, conf, tag }
+  const sectionAt = new Map(pieces.map((p) => [p.from, p]));
+  const men = new Map(); // start square -> man
+  const tracked = []; // men that carry a section
   const byId = new Map();
   const pickable = [];
 
-  for (const p of pieces) {
-    const material = ivory.clone();
-    material.emissive = gold.clone();
-    material.emissiveIntensity = 0;
-    const group = buildPiece(p.type, material);
-    const box = new THREE.Box3().setFromObject(group);
-    const corners = [];
-    for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z]) corners.push(new THREE.Vector3(x, y, z).divideScalar(group.scale.x));
-    const home = squarePos(p.square);
-    const baseRot = p.type === 'knight' ? KNIGHT_TURN : 0;
+  for (const [start, { side, type }] of Object.entries(startPosition)) {
+    const section = sectionAt.get(start);
+    const base = side === 'white' ? ivory : navy;
+    let material = base;
+    if (section) {
+      material = base.clone();
+      material.emissive = gold.clone();
+      material.emissiveIntensity = 0;
+    }
+    const group = buildPiece(type, material);
+    const baseRot = (side === 'black' ? Math.PI : 0) + (type === 'knight' ? KNIGHT_TURN : 0);
+    const man = { start, side, type, group, material, baseRot, home: squarePos(start) };
+    if (section) {
+      const local = new THREE.Box3().setFromObject(group);
+      const s = group.scale.x;
+      man.corners = [];
+      for (const x of [local.min.x, local.max.x]) for (const y of [local.min.y, local.max.y]) for (const z of [local.min.z, local.max.z]) man.corners.push(new THREE.Vector3(x / s, y / s, z / s));
+      Object.assign(man, { id: section.id, section, height: local.max.y, glow: 0, glowTo: 0, rect: { x: 0, y: 0, w: 0, h: 0 } });
+      group.userData.id = section.id;
+      tracked.push(man);
+      byId.set(section.id, man);
+    }
     group.rotation.y = baseRot;
-    group.position.copy(playIntro ? squarePos(p.from) : home);
-    group.userData.id = p.id;
+    group.position.copy(man.home);
     scene.add(group);
-    const entry = { id: p.id, group, material, home, baseRot, corners, height: box.max.y, tag: p.tag, conf: p.conf, glow: 0, glowTo: 0 };
-    white.push(entry);
-    byId.set(p.id, entry);
+    men.set(start, man);
     pickable.push(group);
   }
-
-  const black = new Map();
-  const backRank = ['rook', 'knight', 'bishop', 'queen', 'king', 'bishop', 'knight', 'rook'];
-  for (let f = 0; f < 8; f++) {
-    for (const [type, rank] of [[backRank[f], 8], ['pawn', 7]]) {
-      const square = FILES[f] + rank;
-      const group = buildPiece(type, navy);
-      group.rotation.y = Math.PI + (type === 'knight' ? KNIGHT_TURN : 0);
-      group.position.copy(squarePos(square));
-      scene.add(group);
-      black.set(square, group);
-      pickable.push(group);
-    }
-  }
-  if (!playIntro && opening) for (const m of opening) if (m.black) black.get(m.black).position.copy(squarePos(m.to));
+  // Where everything ends up once the opening has been played.
+  for (const m of opening || []) men.get(m.from).home = squarePos(m.to);
+  if (!playIntro) for (const man of men.values()) man.group.position.copy(man.home);
 
   // ---- square markers ----
   const markerGeo = new THREE.PlaneGeometry(0.96, 0.96).rotateX(-Math.PI / 2);
@@ -120,21 +125,28 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
   const selectMarker = makeMarker();
 
   // ---- detection boxes ----
-  for (const w of white) {
+  for (const man of tracked) {
+    const p = man.section;
     const el = document.createElement('div');
     el.className = 'det';
+    const label = document.createElement('span');
+    label.className = 'det-label';
     const tag = document.createElement('span');
     tag.className = 'det-tag';
     const name = document.createElement('b');
-    name.textContent = w.tag;
+    name.textContent = p.tag;
     const conf = document.createElement('i');
-    conf.textContent = w.conf.toFixed(2);
+    conf.textContent = p.conf.toFixed(2);
     tag.append(name, ' ', conf);
-    el.append(tag);
+    const more = document.createElement('span');
+    more.className = 'det-more';
+    more.textContent = p.teaser || p.meta || '';
+    label.append(tag, more);
+    el.append(label);
     overlay.append(el);
-    w.el = el;
-    w.confEl = conf;
-    w.rect = { x: 0, y: 0, w: 0, h: 0 };
+    man.el = el;
+    man.labelEl = label;
+    man.confEl = conf;
   }
   const svgNS = 'http://www.w3.org/2000/svg';
   const leaderSvg = document.createElementNS(svgNS, 'svg');
@@ -173,27 +185,33 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
   let height = 1;
   let selected = null;
   let hovered = null;
+  let popup = null; // id of the piece the idle cycle is currently showing
+  let nextPopup = Infinity;
   let touched = false; // has the visitor moved the camera themselves?
+  let lastTouch = 0;
+  let holding = false;
   let drifting = false;
   let flying = null;
+  let live = false; // intro finished
   const view = { x: 0, y: 0, toX: 0, toY: 0 };
 
   const isMobile = () => width < MOBILE;
 
   const insets = { left: 0, right: 0, top: 0, bottom: 0, ...firstInsets };
-  const probe = new THREE.PerspectiveCamera(30, 1, 0.1, 200);
+  const probe = new THREE.PerspectiveCamera(camera.fov, 1, 0.1, 200);
   const fitPoints = [];
   for (const x of [-4.5, 4.5]) for (const z of [-4.5, 4.5]) fitPoints.push(new THREE.Vector3(x, -0.3, z));
   for (const x of [-3.5, 3.5]) fitPoints.push(new THREE.Vector3(x, 1.75, -3.5));
 
   // Back the camera off until the whole board fits the free part of the
-  // screen, then shift the view so the board sits in the middle of it.
+  // screen, then shift the view so the board rests low in it, leaving the
+  // room visible above.
   function homePose() {
     const mobile = isMobile();
     const target = new THREE.Vector3(0, 0, 0.2);
-    const phi = rad(mobile ? 40 : 54);
-    const theta = rad(mobile ? -18 : -27);
-    const pad = mobile ? { top: 12, side: 8, bottom: 52 } : { top: 64, side: 40, bottom: 60 };
+    const phi = rad(mobile ? 54 : 69);
+    const theta = rad(mobile ? -16 : -24);
+    const pad = mobile ? { top: 12, side: 8, bottom: 56 } : { top: height * 0.42, side: 60, bottom: 64 };
     const x0 = insets.left + pad.side;
     const x1 = width - pad.side;
     const y0 = insets.top + pad.top;
@@ -201,9 +219,9 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
     probe.aspect = width / height;
     probe.updateProjectionMatrix();
     const v = new THREE.Vector3();
-    let radius = 11;
+    let radius = 12;
     let shift = { x: 0, y: 0 };
-    for (; radius < 80; radius += 0.5) {
+    for (; radius < controls.maxDistance - 1; radius += 0.5) {
       probe.position.setFromSphericalCoords(radius, phi, theta).add(target);
       probe.lookAt(target);
       probe.updateMatrixWorld();
@@ -215,23 +233,35 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
         bx0 = Math.min(bx0, x); bx1 = Math.max(bx1, x);
         by0 = Math.min(by0, y); by1 = Math.max(by1, y);
       }
-      shift = { x: (bx0 + bx1) / 2 - (x0 + x1) / 2, y: (by0 + by1) / 2 - (y0 + y1) / 2 };
+      // centred sideways; on wide screens resting on the bottom of the free area
+      shift = { x: (bx0 + bx1) / 2 - (x0 + x1) / 2, y: mobile ? (by0 + by1) / 2 - (y0 + y1) / 2 : by1 - y1 };
       if (bx1 - bx0 <= x1 - x0 && by1 - by0 <= y1 - y0) break;
     }
     const pos = new THREE.Vector3().setFromSphericalCoords(radius, phi, theta).add(target);
     return { pos, target, shift };
   }
 
-  function focusPose(w) {
-    const target = w.home.clone();
-    target.y = LIFT + w.height / 2;
+  function focusPose(man) {
+    const target = man.home.clone();
+    target.y = LIFT + man.height / 2;
     const offset = camera.position.clone().sub(controls.target);
     const current = new THREE.Spherical().setFromVector3(offset);
     const theta = THREE.MathUtils.clamp(current.theta, -0.75, 0.75);
-    const pos = new THREE.Vector3().setFromSphericalCoords(isMobile() ? 9.5 : 7.6, rad(63), theta).add(target);
+    // Look a little more steeply at far pieces, so near ones don't block them.
+    const far = THREE.MathUtils.clamp((2 - man.home.z) / 5.5, 0, 1);
+    const pos = new THREE.Vector3().setFromSphericalCoords((isMobile() ? 9.5 : 7.8) + far * 0.8, rad(64 - far * 12), theta).add(target);
     // Centre the piece in whatever the panel and index leave free.
     const shift = { x: (insets.right - insets.left) / 2, y: (insets.bottom - insets.top) / 2 };
     return { pos, target, shift };
+  }
+
+  function setShift(shift, snap = false) {
+    view.toX = shift.x;
+    view.toY = shift.y;
+    if (snap || reducedMotion) {
+      view.x = shift.x;
+      view.y = shift.y;
+    }
   }
 
   function flyTo(pose, duration = 950, ease = easeInOut) {
@@ -252,15 +282,7 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
         if (!selected && !touched && !reducedMotion) startDrift();
       },
     });
-  }
-
-  function setShift(shift, snap = false) {
-    view.toX = shift.x;
-    view.toY = shift.y;
-    if (snap || reducedMotion) {
-      view.x = shift.x;
-      view.y = shift.y;
-    }
+    if (reducedMotion) flying = null;
   }
 
   let driftStart = 0;
@@ -270,9 +292,16 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
   }
   controls.addEventListener('start', () => {
     touched = true;
+    holding = true;
     drifting = false;
     controls.autoRotate = false;
+    lastTouch = performance.now();
   });
+  controls.addEventListener('end', () => {
+    holding = false;
+    lastTouch = performance.now();
+  });
+  canvas.addEventListener('wheel', () => { lastTouch = performance.now(); }, { passive: true });
 
   function resize() {
     width = canvas.clientWidth || window.innerWidth;
@@ -289,14 +318,23 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
     }
   }
 
-  // ---- selection ----
-  function setGlow() {
-    for (const w of white) w.glowTo = w.id === selected ? 0.16 : w.id === hovered ? 0.07 : 0;
-  }
-
-  function placeMarker(marker, w, opacity) {
-    if (w) marker.position.set(w.home.x, 0.004, w.home.z);
-    marker.userData.to = w ? opacity : 0;
+  // ---- selection, hover, pop-ups ----
+  function refresh() {
+    const hot = hovered || popup;
+    for (const m of tracked) {
+      const k = m.side === 'black' ? 0.55 : 1; // gold reads much stronger on the dark pieces
+      m.glowTo = (m.id === selected ? 0.18 : m.id === hot ? 0.09 : 0) * k;
+      m.el.classList.toggle('is-selected', m.id === selected);
+      m.el.classList.toggle('is-hot', m.id === hovered);
+      m.el.classList.toggle('is-popup', m.id === popup && !hovered);
+    }
+    const hotMan = byId.get(hot);
+    if (hotMan) hoverMarker.position.set(hotMan.home.x, 0.004, hotMan.home.z);
+    hoverMarker.userData.to = hotMan && hot !== selected ? 0.3 : 0;
+    const sel = byId.get(selected);
+    if (sel) selectMarker.position.set(sel.home.x, 0.004, sel.home.z);
+    selectMarker.userData.to = sel ? 0.5 : 0;
+    overlay.classList.toggle('has-selection', Boolean(sel));
   }
 
   function select(id) {
@@ -304,8 +342,8 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
     settle();
     const prev = byId.get(selected);
     if (prev) {
-      const fromY = prev.group.position.y;
       const turn = Math.PI * 2;
+      const fromY = prev.group.position.y;
       const fromR = (((prev.group.rotation.y - prev.baseRot) % turn) + turn) % turn + prev.baseRot;
       const toR = prev.baseRot + (fromR - prev.baseRot > Math.PI ? turn : 0);
       tween({
@@ -318,15 +356,14 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
       });
     }
     selected = id && byId.has(id) ? id : null;
-    const w = byId.get(selected);
-    overlay.classList.toggle('has-selection', Boolean(w));
-    for (const o of white) o.el.classList.toggle('is-selected', o === w);
-    placeMarker(selectMarker, w, 0.5);
-    setGlow();
-    if (w) {
-      const fromY = w.group.position.y;
-      tween({ duration: 600, ease: easeOut, update: (k) => { w.group.position.y = fromY + (LIFT - fromY) * k; } });
-      flyTo(focusPose(w));
+    popup = null;
+    nextPopup = performance.now() + POPUP_EVERY;
+    const man = byId.get(selected);
+    refresh();
+    if (man) {
+      const fromY = man.group.position.y;
+      tween({ duration: 600, ease: easeOut, update: (k) => { man.group.position.y = fromY + (LIFT - fromY) * k; } });
+      flyTo(focusPose(man));
     } else {
       touched = false;
       flyTo(homePose());
@@ -337,9 +374,33 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
     const next = id && byId.has(id) ? id : null;
     if (next === hovered) return;
     hovered = next;
-    for (const o of white) o.el.classList.toggle('is-hot', o.id === hovered);
-    placeMarker(hoverMarker, byId.get(hovered), hovered === selected ? 0 : 0.26);
-    setGlow();
+    if (hovered) popup = null;
+    nextPopup = performance.now() + POPUP_EVERY;
+    refresh();
+  }
+
+  // While nobody is interacting, show one section's label at a time and give
+  // its piece a small hop, so it is obvious the pieces can be opened.
+  const whiteIds = tracked.filter((m) => m.side === 'white').map((m) => m.id);
+  const blackIds = tracked.filter((m) => m.side === 'black').map((m) => m.id);
+  const popupOrder = [];
+  for (let i = 0; i < Math.max(whiteIds.length, blackIds.length); i++) {
+    if (whiteIds[i]) popupOrder.push(whiteIds[i]);
+    if (blackIds[i]) popupOrder.push(blackIds[i]);
+  }
+  let popupIndex = 0;
+  function stepPopups(now) {
+    if (!live || selected || hovered || holding || flying) {
+      if (popup) { popup = null; refresh(); }
+      if (nextPopup < now + 1200) nextPopup = now + 1200;
+      return;
+    }
+    if (now < nextPopup) return;
+    popup = popupOrder[popupIndex++ % popupOrder.length];
+    nextPopup = now + POPUP_EVERY;
+    refresh();
+    const man = byId.get(popup);
+    tween({ duration: 520, ease: (t) => t, update: (k) => { if (man.id !== selected) man.group.position.y = Math.sin(Math.PI * k) * 0.3; } });
   }
 
   // Called when the panel opens, closes or the window changes: the free area
@@ -348,8 +409,8 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
     const before = JSON.stringify(insets);
     Object.assign(insets, { left: 0, right: 0, top: 0, bottom: 0 }, next);
     if (JSON.stringify(insets) === before) return;
-    const w = byId.get(selected);
-    if (w) setShift(focusPose(w).shift);
+    const man = byId.get(selected);
+    if (man) setShift(focusPose(man).shift);
     else if (!touched && !flying) flyTo(homePose(), 500);
     else setShift(homePose().shift);
   }
@@ -369,19 +430,19 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
       while (o && !o.userData.id && o.parent) o = o.parent;
       if (o && o.userData.id) return o.userData.id;
     }
-    // Missed the mesh: the detection boxes count as targets too.
+    // Missed a section piece: the detection boxes count as targets too.
     let best = null;
     let bestD = Infinity;
-    for (const w of white) {
-      const b = w.rect;
+    for (const m of tracked) {
+      const b = m.rect;
       if (px < b.x || px > b.x + b.w || py < b.y || py > b.y + b.h) continue;
       const d = Math.hypot(px - (b.x + b.w / 2), py - (b.y + b.h / 2));
       if (d < bestD) {
         bestD = d;
-        best = w.id;
+        best = m.id;
       }
     }
-    return hit ? null : best;
+    return best;
   }
 
   let down = null;
@@ -408,23 +469,30 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
   let intro = [];
   let scanTimers = [];
 
-  function movePiece(group, to, { delay, hop }) {
-    const from = group.position.clone();
+  function movePiece(man, { delay, hop }) {
+    const from = man.group.position.clone();
     return tween({
       duration: hop ? 620 : 520,
       delay,
       update: (k) => {
-        group.position.lerpVectors(from, to, k);
-        group.position.y = Math.sin(Math.PI * k) * (hop ? 0.95 : 0.1);
+        man.group.position.lerpVectors(from, man.home, k);
+        man.group.position.y = Math.sin(Math.PI * k) * (hop ? 0.95 : 0.1);
       },
     });
   }
 
+  function goLive() {
+    if (live) return;
+    live = true;
+    overlay.classList.add('is-live');
+    nextPopup = performance.now() + 3000;
+  }
+
   function scan() {
-    const order = [...white].sort((a, b) => a.rect.x - b.rect.x);
-    order.forEach((w, i) => {
-      scanTimers.push(setTimeout(() => w.el.classList.add('is-scan'), i * 80));
-      scanTimers.push(setTimeout(() => w.el.classList.remove('is-scan'), i * 80 + 1300));
+    const order = [...tracked].sort((a, b) => a.rect.x - b.rect.x);
+    order.forEach((m, i) => {
+      scanTimers.push(setTimeout(() => m.el.classList.add('is-scan'), i * 80));
+      scanTimers.push(setTimeout(() => m.el.classList.remove('is-scan'), i * 80 + 1300));
     });
   }
 
@@ -434,8 +502,8 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
     intro = [];
     for (const t of scanTimers) clearTimeout(t);
     scanTimers = [];
-    for (const w of white) w.el.classList.remove('is-scan');
-    overlay.classList.add('is-live');
+    for (const m of tracked) m.el.classList.remove('is-scan');
+    goLive();
   }
 
   function start() {
@@ -445,29 +513,28 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
     if (!playIntro) {
       camera.position.copy(home.pos);
       controls.target.copy(home.target);
-      overlay.classList.add('is-live');
+      goLive();
       return;
     }
+    // Establishing shot: low and wide across the room, then in to the board.
     controls.target.copy(home.target);
-    camera.position.setFromSphericalCoords(home.pos.distanceTo(home.target) * 1.45, rad(26), rad(-78)).add(home.target);
-    flyTo(home, 3600, easeOut);
-    let at = 650;
+    camera.position.setFromSphericalCoords(Math.min(controls.maxDistance, home.pos.distanceTo(home.target) * 1.7), rad(80), rad(-62)).add(home.target);
+    flyTo(home, 4200, easeInOut);
+    let at = 1500;
     for (const m of opening) {
-      const group = m.id ? byId.get(m.id).group : black.get(m.black);
-      intro.push(movePiece(group, squarePos(m.to), { delay: at, hop: m.hop }));
+      intro.push(movePiece(men.get(m.from), { delay: at, hop: m.hop }));
       at += 600;
     }
-    intro.push(tween({ duration: 1, delay: at + 250, update() {}, done: () => { overlay.classList.add('is-live'); scan(); } }));
+    intro.push(tween({ duration: 1, delay: at + 250, update() {}, done: () => { goLive(); scan(); } }));
   }
 
   // ---- frame loop ----
   const corner = new THREE.Vector3();
   function updateBoxes() {
-    const sel = byId.get(selected);
-    for (const w of white) {
+    for (const m of tracked) {
       let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-      for (const c of w.corners) {
-        corner.copy(c).applyMatrix4(w.group.matrixWorld).project(camera);
+      for (const c of m.corners) {
+        corner.copy(c).applyMatrix4(m.group.matrixWorld).project(camera);
         const x = (corner.x * 0.5 + 0.5) * width;
         const y = (-corner.y * 0.5 + 0.5) * height;
         if (x < x0) x0 = x;
@@ -475,13 +542,22 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
         if (y < y0) y0 = y;
         if (y > y1) y1 = y;
       }
-      const b = w.rect;
+      const b = m.rect;
       b.x = x0 - 3; b.y = y0 - 3; b.w = x1 - x0 + 6; b.h = y1 - y0 + 6;
-      w.el.style.transform = `translate3d(${b.x.toFixed(1)}px, ${b.y.toFixed(1)}px, 0)`;
-      w.el.style.width = `${b.w.toFixed(1)}px`;
-      w.el.style.height = `${b.h.toFixed(1)}px`;
-      w.el.classList.toggle('tag-below', b.y < 30);
+      m.el.style.transform = `translate3d(${b.x.toFixed(1)}px, ${b.y.toFixed(1)}px, 0)`;
+      m.el.style.width = `${b.w.toFixed(1)}px`;
+      m.el.style.height = `${b.h.toFixed(1)}px`;
+      m.el.classList.toggle('tag-below', b.y < 34);
+      // Keep a visible label on screen: slide it sideways if it would run off an edge.
+      const c = m.el.classList;
+      if (c.contains('is-popup') || c.contains('is-hot') || c.contains('is-scan') || c.contains('is-selected')) {
+        const lw = m.labelEl.offsetWidth;
+        let dx = Math.min(0, width - 8 - (b.x - 2 + lw));
+        dx = Math.max(dx, 8 - (b.x - 2));
+        m.labelEl.style.transform = `translateX(${dx.toFixed(0)}px)`;
+      }
     }
+    const sel = byId.get(selected);
     const a = sel && anchor ? anchor() : null;
     if (a) {
       const b = sel.rect;
@@ -499,11 +575,11 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
   function jitter(now) {
     if (now - lastConf < 450) return;
     lastConf = now;
-    for (const w of white) {
-      const c = w.el.classList;
-      if (!(c.contains('is-hot') || c.contains('is-selected') || c.contains('is-scan'))) continue;
-      const v = Math.min(0.99, Math.max(0.8, w.conf + (Math.random() - 0.5) * 0.03));
-      w.confEl.textContent = v.toFixed(2);
+    for (const m of tracked) {
+      const c = m.el.classList;
+      if (!(c.contains('is-hot') || c.contains('is-selected') || c.contains('is-scan') || c.contains('is-popup'))) continue;
+      const v = Math.min(0.99, Math.max(0.8, m.section.conf + (Math.random() - 0.5) * 0.03));
+      m.confEl.textContent = v.toFixed(2);
     }
   }
 
@@ -520,19 +596,27 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
     last = now;
     stepTweens(now);
 
+    // Left alone for a while after being dragged: go back to the home view.
+    if (touched && !selected && !holding && !flying && !reducedMotion && now - lastTouch > IDLE_RETURN) {
+      touched = false;
+      flyTo(homePose(), 1800);
+    }
+
     if (flying) {
       camera.lookAt(controls.target);
     } else {
       controls.autoRotate = drifting;
-      if (drifting) controls.autoRotateSpeed = 0.3 * Math.sin(((now - driftStart) / 1000) * ((Math.PI * 2) / 22));
+      if (drifting) controls.autoRotateSpeed = 0.42 * Math.sin(((now - driftStart) / 1000) * ((Math.PI * 2) / 24));
       controls.update();
     }
 
+    stepPopups(now);
+
     const sel = byId.get(selected);
     if (sel && !reducedMotion) sel.group.rotation.y += dt * 0.45;
-    for (const w of white) {
-      w.glow += (w.glowTo - w.glow) * smooth(8);
-      w.material.emissiveIntensity = w.glow;
+    for (const m of tracked) {
+      m.glow += (m.glowTo - m.glow) * smooth(8);
+      m.material.emissiveIntensity = m.glow;
     }
     for (const m of [hoverMarker, selectMarker]) {
       const to = m.userData.to || 0;
@@ -556,6 +640,8 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
   }
 
   window.addEventListener('resize', resize);
+  // ?debug in the address exposes the camera, for positioning shots by hand.
+  if (new URLSearchParams(location.search).has('debug')) window.__scene = { camera, controls, hold: () => { touched = true; lastTouch = Infinity; drifting = false; } };
   start();
   requestAnimationFrame(frame);
 
@@ -611,11 +697,12 @@ function buildBoard(renderer) {
   top.receiveShadow = true;
   group.add(top);
 
+  const frameHeight = -TABLE_TOP - 0.002;
   const frame = new THREE.Mesh(
-    new THREE.BoxGeometry(8.9, 0.34, 8.9),
+    new THREE.BoxGeometry(8.9, frameHeight, 8.9),
     new THREE.MeshPhysicalMaterial({ color: 0x06304d, roughness: 0.35, metalness: 0.25, clearcoat: 0.5 }),
   );
-  frame.position.y = -0.172;
+  frame.position.y = -0.002 - frameHeight / 2;
   frame.castShadow = true;
   frame.receiveShadow = true;
   group.add(frame);
@@ -627,11 +714,6 @@ function buildBoard(renderer) {
     bar.position.set(x, 0.001, z);
     group.add(bar);
   }
-
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(90, 90).rotateX(-Math.PI / 2), new THREE.ShadowMaterial({ opacity: 0.3 }));
-  floor.position.y = -0.345;
-  floor.receiveShadow = true;
-  group.add(floor);
 
   return group;
 }

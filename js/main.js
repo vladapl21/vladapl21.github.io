@@ -2,6 +2,7 @@
 // routing. The 3D board is loaded separately so the page still works without it.
 
 import { person, groups, pieces, opening } from './content.js';
+import { startPosition } from './chess.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 
@@ -18,7 +19,13 @@ function el(tag, props = {}, ...children) {
   return node;
 }
 
-const GLYPH = { king: '♔', queen: '♕', rook: '♖', bishop: '♗', knight: '♘', pawn: '♙' };
+// Chess symbols for the index; the trailing selector keeps them as text, not emoji.
+const GLYPH = {
+  white: { king: '♔', queen: '♕', rook: '♖', bishop: '♗', knight: '♘', pawn: '♙' },
+  black: { king: '♚', queen: '♛', rook: '♜', bishop: '♝', knight: '♞', pawn: '♟' },
+};
+const pieceOf = (p) => startPosition[p.from];
+const glyph = (p) => `${GLYPH[pieceOf(p).side][pieceOf(p).type]}\uFE0E`;
 const byId = new Map(pieces.map((p) => [p.id, p]));
 const ordered = groups.flatMap((g) => pieces.filter((p) => p.group === g));
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -87,7 +94,7 @@ function buildIndex() {
               onmouseleave: () => setHover(null),
               onfocus: () => setHover(p.id),
               onblur: () => setHover(null),
-            }, el('span', { class: 'glyph', 'aria-hidden': 'true', text: GLYPH[p.type] }), p.tag))))),
+            }, el('span', { class: 'glyph', 'aria-hidden': 'true', text: glyph(p) }), p.tag))))),
     );
   }
 }
@@ -110,7 +117,7 @@ function renderPanel(p) {
       el('a', { class: 'close', href: '#', 'aria-label': 'Close', text: '×', onclick: (e) => { e.preventDefault(); go(null); } })),
     el('div', { class: 'panel-body' },
       photoBlock(p),
-      el('p', { class: 'kind', text: `${p.group}, on the ${p.type}` }),
+      el('p', { class: 'kind', text: `${p.group}, on the ${pieceOf(p).side} ${pieceOf(p).type}` }),
       contentBlocks(p)),
     el('footer', { class: 'panel-foot' },
       el('a', { href: `#${prev.id}`, class: 'step' }, el('small', { text: 'Previous' }), prev.tag),
