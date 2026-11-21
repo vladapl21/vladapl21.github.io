@@ -39,7 +39,7 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
   scene.environment = reflections;
   scene.environmentIntensity = 0.045;
 
-  const camera = new THREE.PerspectiveCamera(32, 1, 0.2, 400);
+  const camera = new THREE.PerspectiveCamera(32, 1, 0.4, 400);
   const controls = new OrbitControls(camera, canvas);
   controls.enableDamping = true;
   controls.dampingFactor = 0.08;
@@ -52,7 +52,7 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
   controls.maxPolarAngle = 1.46;
   // Stay on White's side of the table; the sofa is on the other.
   controls.minAzimuthAngle = -1.75;
-  controls.maxAzimuthAngle = 1.75;
+  controls.maxAzimuthAngle = 1.4;
 
   // ---- lights ----
   // One lamp over the table: a pool of light on the board that falls off
@@ -120,8 +120,8 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
   // ---- square markers ----
   const markerGeo = new THREE.PlaneGeometry(0.96, 0.96).rotateX(-Math.PI / 2);
   const makeMarker = () => {
-    const m = new THREE.Mesh(markerGeo, new THREE.MeshBasicMaterial({ color: 0xffd100, transparent: true, opacity: 0, depthWrite: false }));
-    m.position.y = 0.004;
+    const m = new THREE.Mesh(markerGeo, new THREE.MeshBasicMaterial({ color: 0xffd100, transparent: true, opacity: 0, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+    m.position.y = 0.006;
     scene.add(m);
     return m;
   };
@@ -333,10 +333,10 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
       m.el.classList.toggle('is-popup', m.id === popup && !hovered);
     }
     const hotMan = byId.get(hot);
-    if (hotMan) hoverMarker.position.set(hotMan.home.x, 0.004, hotMan.home.z);
+    if (hotMan) hoverMarker.position.set(hotMan.home.x, 0.006, hotMan.home.z);
     hoverMarker.userData.to = hotMan && hot !== selected ? 0.3 : 0;
     const sel = byId.get(selected);
-    if (sel) selectMarker.position.set(sel.home.x, 0.004, sel.home.z);
+    if (sel) selectMarker.position.set(sel.home.x, 0.006, sel.home.z);
     selectMarker.userData.to = sel ? 0.5 : 0;
     overlay.classList.toggle('has-selection', Boolean(sel));
   }
@@ -645,7 +645,7 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
 
   window.addEventListener('resize', resize);
   // ?debug in the address exposes the camera, for positioning shots by hand.
-  if (new URLSearchParams(location.search).has('debug')) window.__scene = { camera, controls, hold: () => { touched = true; lastTouch = Infinity; drifting = false; } };
+  if (new URLSearchParams(location.search).has('debug')) window.__scene = { camera, controls, brighten: () => { scene.add(new THREE.HemisphereLight(0xffffff, 0x888888, 1.6)); scene.fog = null; }, hold: () => { touched = true; lastTouch = Infinity; drifting = false; } };
   start();
   requestAnimationFrame(frame);
 
@@ -695,18 +695,18 @@ function buildBoard(renderer, reflections) {
   map.anisotropy = renderer.capabilities.getMaxAnisotropy();
 
   const top = new THREE.Mesh(
-    new THREE.PlaneGeometry(8, 8).rotateX(-Math.PI / 2),
+    new THREE.BoxGeometry(8, 0.03, 8).translate(0, -0.015, 0),
     new THREE.MeshPhysicalMaterial({ map, roughness: 0.38, clearcoat: 0.35, clearcoatRoughness: 0.3, envMap: reflections, envMapIntensity: 0.25 }),
   );
   top.receiveShadow = true;
   group.add(top);
 
-  const frameHeight = -TABLE_TOP - 0.002;
+  const frameHeight = -TABLE_TOP - 0.03;
   const frame = new THREE.Mesh(
     new THREE.BoxGeometry(8.9, frameHeight, 8.9),
     new THREE.MeshPhysicalMaterial({ color: 0x06304d, roughness: 0.35, metalness: 0.25, clearcoat: 0.5, envMap: reflections, envMapIntensity: 0.3 }),
   );
-  frame.position.y = -0.002 - frameHeight / 2;
+  frame.position.y = -0.03 - frameHeight / 2;
   frame.castShadow = true;
   frame.receiveShadow = true;
   group.add(frame);
@@ -714,8 +714,8 @@ function buildBoard(renderer, reflections) {
   const inlay = new THREE.MeshStandardMaterial({ color: 0xffd100, emissive: 0xffd100, emissiveIntensity: 0.35, metalness: 0.7, roughness: 0.3 });
   const half = 4.16;
   for (const [x, z, w, d] of [[0, -half, half * 2 + 0.04, 0.04], [0, half, half * 2 + 0.04, 0.04], [-half, 0, 0.04, half * 2], [half, 0, 0.04, half * 2]]) {
-    const bar = new THREE.Mesh(new THREE.BoxGeometry(w, 0.01, d), inlay);
-    bar.position.set(x, 0.001, z);
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(w, 0.03, d), inlay);
+    bar.position.set(x, -0.012, z);
     group.add(bar);
   }
 

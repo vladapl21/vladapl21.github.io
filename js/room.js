@@ -62,7 +62,8 @@ function blob(w, d, x, z, opacity = 0.55) {
     new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2),
     new THREE.MeshBasicMaterial({ map: blobTexture, transparent: true, opacity, depthWrite: false }),
   );
-  m.position.set(x, FLOOR + 0.04, z);
+  m.position.set(x, FLOOR + 0.11, z);
+  m.renderOrder = 1;
   return m;
 }
 
@@ -288,7 +289,7 @@ function eggsBenedict() {
     for (let k = 0; k < 7; k++) {
       const a = rand() * Math.PI * 2;
       const r = rand() * 0.42;
-      const chive = mesh(new THREE.BoxGeometry(0.13, 0.03, 0.05), mat(0x3f8a3c, 0.8), x + Math.cos(a) * r, 1.21 - r * 0.12, z + Math.sin(a) * r, false);
+      const chive = mesh(new THREE.BoxGeometry(0.13, 0.03, 0.05), mat(0x3f8a3c, 0.8), x + 0.04 + Math.cos(a) * r, 0.985 + 0.228 * Math.sqrt(1 - (r / 0.6) ** 2), z + Math.sin(a) * r * 0.92, false);
       chive.rotation.y = rand() * 3;
       g.add(chive);
     }
@@ -325,16 +326,17 @@ function pokerHand() {
   const g = new THREE.Group();
   const chip = new THREE.CylinderGeometry(0.56, 0.56, 0.1, 28);
   const colors = [0x2774ae, 0xf4f1ea, 0xd7a91a, 0x10151c, 0x2774ae, 0xd7a91a, 0xf4f1ea, 0x2774ae, 0x10151c];
-  colors.forEach((c, i) => g.add(mesh(chip, mat(c, 0.5), 0.02 * Math.sin(i * 2.1), 0.05 + i * 0.102, 0.02 * Math.cos(i * 1.7))));
-  g.add(mesh(chip, mat(0xd7a91a, 0.5), 1.35, 0.05, 0.5));
-  const leaning = mesh(chip, mat(0x2774ae, 0.5), 0.72, 0.2, 0.25);
-  leaning.rotation.z = -0.5;
-  g.add(leaning);
+  const stack = (list, x, z) => list.forEach((c, i) => g.add(mesh(chip, mat(c, 0.5), x + 0.015 * Math.sin(i * 2.1), 0.05 + i * 0.1, z + 0.015 * Math.cos(i * 1.7))));
+  stack(colors, 0, 0);
+  stack([0xd7a91a, 0x10151c, 0xd7a91a, 0xf4f1ea], -0.25, 1.45);
+  // loose chips lying flat, each clear of the stacks and of each other
+  g.add(mesh(chip, mat(0xd7a91a, 0.5), 1.5, 0.05, 0.5));
+  g.add(mesh(chip, mat(0x2774ae, 0.5), 0.95, 0.05, -1.15));
   const back = mat(0xfbf9f2, 0.6);
   ['A', 'K'].forEach((rank, i) => {
     const card = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.02, 2.45), [back, back, new THREE.MeshStandardMaterial({ map: cardTexture(rank), roughness: 0.6 }), back, back, back]);
-    card.position.set(-2.3 + i * 0.75, 0.02 + i * 0.022, 0.5 - i * 0.2);
-    card.rotation.y = 0.5 - i * 0.42;
+    card.position.set(-3.5 + i * 1.45, 0.012 + i * 0.022, 0.5 - i * 0.25);
+    card.rotation.y = 0.32 - i * 0.3;
     card.receiveShadow = true;
     g.add(card);
   });
@@ -342,16 +344,22 @@ function pokerHand() {
 }
 
 function shuttlecock() {
-  const g = new THREE.Group();
+  const body = new THREE.Group();
   const cork = mesh(new THREE.SphereGeometry(0.26, 16, 12), mat(0xf4f1ea, 0.5), 0, 0, 0);
   const band = mesh(new THREE.CylinderGeometry(0.265, 0.265, 0.07, 16), mat(0x2774ae, 0.5), 0, 0.14, 0, false);
   const skirt = new THREE.Mesh(
     new THREE.CylinderGeometry(0.72, 0.24, 0.95, 16, 1, true),
-    new THREE.MeshStandardMaterial({ color: 0xfbfaf5, roughness: 0.7, side: THREE.DoubleSide, transparent: true, opacity: 0.9 }),
+    new THREE.MeshStandardMaterial({ color: 0xfbfaf5, roughness: 0.7, side: THREE.DoubleSide }),
   );
   skirt.position.y = 0.62;
   skirt.castShadow = true;
-  g.add(cork, band, skirt);
+  body.add(cork, band, skirt);
+  // Lying down, the cork (radius 0.26) and the skirt's rim (radius 0.72, 1.095
+  // along the axis) both touch the table when the axis points 0.381 rad above flat.
+  body.rotation.z = -(Math.PI / 2 - 0.381);
+  body.position.y = 0.26;
+  const g = new THREE.Group();
+  g.add(body);
   return g;
 }
 
@@ -386,8 +394,19 @@ function golfBalls() {
   g.add(bowl);
   const ball = new THREE.SphereGeometry(0.4, 16, 12);
   const white = mat(0xf7f6f1, 0.45);
-  for (const [x, y, z] of [[-0.5, 0.48, 0.2], [0.42, 0.5, -0.3], [0.1, 0.5, 0.62], [-0.2, 0.52, -0.55], [0.05, 1.05, 0.05]]) g.add(mesh(ball, white, x, y, z));
-  g.add(mesh(ball, white, 2.4, 0.4, 0.9));
+  for (const [x, y, z] of [[-0.41, 0.5, -0.41], [0.41, 0.5, -0.41], [-0.41, 0.5, 0.41], [0.41, 0.5, 0.41], [0, 1.075, 0]]) g.add(mesh(ball, white, x, y, z));
+  g.add(mesh(ball, white, -2.0, 0.4, 1.2));
+  return g;
+}
+
+// A closed book lying flat: two covers, a spine along one long edge, pages inside.
+function book(w, h, d, color) {
+  const g = new THREE.Group();
+  const cover = mat(color, 0.6);
+  g.add(box(w, 0.07, d, cover, 0, 0.035, 0, { cast: true }));
+  g.add(box(w, 0.07, d, cover, 0, h - 0.035, 0, { cast: true }));
+  g.add(box(0.07, h, d, cover, -w / 2 + 0.035, h / 2, 0));
+  g.add(box(w - 0.2, h - 0.14, d - 0.24, mat(0xe9e2d0, 0.9), 0.03, h / 2, 0, { cast: true }));
   return g;
 }
 
@@ -403,27 +422,24 @@ function tableThings() {
 
   // left of the board: breakfast, coffee, books with a model car on top
   put(eggsBenedict(), -9.8, 4.4, 0.3);
-  put(mugOfCoffee(), -6.4, 7.2, 2.2);
-  const pages = mat(0xe9e2d0, 0.9);
+  put(mugOfCoffee(), -13.1, 0.3, 2.6);
   const books = new THREE.Group();
-  books.add(box(5.2, 0.7, 3.7, mat(0x0b2b47, 0.6), 0, 0.35, 0, { cast: true }));
-  books.add(box(5.0, 0.5, 3.5, pages, 0.06, 0.35, 0.04));
-  const topBook = box(4.4, 0.55, 3.2, mat(0xd7a91a, 0.55), -0.2, 0.98, -0.1, { cast: true });
+  books.add(book(5.2, 0.7, 3.7, 0x0b2b47));
+  const topBook = book(4.4, 0.56, 3.2, 0xd7a91a);
+  topBook.position.set(-0.15, 0.7, -0.05);
   topBook.rotation.y = -0.25;
   books.add(topBook);
   const car = raceCar();
-  car.position.set(-0.2, 1.26, -0.1);
-  car.rotation.y = 1.15;
   car.scale.setScalar(0.92);
+  car.position.set(-0.15, 0.7 + 0.56, -0.05);
+  car.rotation.y = Math.PI / 2 - 0.25;
   books.add(car);
   put(books, -10.6, -4.8, 0.18);
 
   // right of the board: the clock, a poker hand, a shuttlecock, golf balls
   put(chessClock(), 11.6, -7.0, -0.55);
   put(pokerHand(), 10.6, 4.6, -0.2);
-  const birdie = put(shuttlecock(), 7.0, 7.6, 0.4);
-  birdie.rotation.z = 1.25;
-  birdie.position.y = y + 0.5;
+  put(shuttlecock(), 5.6, 8.3, 0.7);
   put(golfBalls(), 12.6, 0.2, 0.6);
 
   return g;
@@ -524,22 +540,26 @@ function skis() {
   return g;
 }
 
+// Lying flat with the handle towards +z; y = 0 is the surface it rests on.
 function badmintonRacket() {
-  const g = new THREE.Group();
+  const flat = new THREE.Group();
   const frame = mat(0x10151c, 0.4);
   const head = new THREE.Mesh(new THREE.TorusGeometry(2.0, 0.09, 8, 40), frame);
   head.scale.set(0.82, 1.1, 1);
-  head.position.y = 7.6;
-  g.add(head);
+  head.position.y = 9.0;
   const strings = new THREE.Mesh(
     new THREE.CircleGeometry(2.0, 32),
-    new THREE.MeshStandardMaterial({ color: 0xf4f1ea, roughness: 0.9, transparent: true, opacity: 0.22, side: THREE.DoubleSide }),
+    new THREE.MeshStandardMaterial({ color: 0xf4f1ea, roughness: 0.9, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false }),
   );
   strings.scale.set(0.82, 1.1, 1);
-  strings.position.y = 7.6;
-  g.add(strings);
-  g.add(mesh(new THREE.CylinderGeometry(0.07, 0.07, 3.6, 8), frame, 0, 3.6, 0, false));
-  g.add(mesh(new THREE.CylinderGeometry(0.17, 0.17, 2.4, 10), mat(0x2774ae, 0.8), 0, 0.9, 0, false));
+  strings.position.y = 9.0;
+  flat.add(head, strings);
+  flat.add(mesh(new THREE.CylinderGeometry(0.07, 0.07, 4.6, 8), frame, 0, 4.6, 0, false));
+  flat.add(mesh(new THREE.CylinderGeometry(0.17, 0.17, 2.6, 10), mat(0x2774ae, 0.8), 0, 1.3, 0, false));
+  flat.rotation.x = -Math.PI / 2; // built upright, then laid down
+  flat.position.y = 0.17; // the grip is the thickest part, so it is what touches
+  const g = new THREE.Group();
+  g.add(flat);
   return g;
 }
 
@@ -565,10 +585,17 @@ function sofa({ width, color, seats }) {
   return g;
 }
 
-function pillow(color, x, y, z, ry, rz) {
-  const p = box(5.2, 5.2, 1.7, mat(color, 0.9), x, y, z, { round: 0.8 });
-  p.rotation.set(-0.35, ry, rz);
-  return p;
+// A square cushion standing on the seat (seatY) and leaning back against the sofa.
+function pillow(color, x, seatY, z, ry) {
+  const lean = 0.35;
+  const p = box(5.2, 5.2, 1.7, mat(color, 0.9), 0, 0, 0, { round: 0.8 });
+  p.rotation.x = -lean;
+  p.position.y = 2.6 * Math.cos(lean) + 0.85 * Math.sin(lean) - 0.2; // bottom edge pressed slightly into the seat
+  const g = new THREE.Group();
+  g.add(p);
+  g.position.set(x, seatY, z);
+  g.rotation.y = ry;
+  return g;
 }
 
 function floorLamp(x, z) {
@@ -593,30 +620,36 @@ function floorLamp(x, z) {
 
 function plant(x, z) {
   const g = new THREE.Group();
-  const pot = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 2.6, 5.4, 28), mat(0xd9d2c3, 0.7));
-  pot.position.y = FLOOR + 2.7;
-  const soil = new THREE.Mesh(new THREE.CircleGeometry(3.2, 28).rotateX(-Math.PI / 2), mat(0x20150c, 1));
-  soil.position.y = FLOOR + 5.3;
-  g.add(pot, soil);
+  const standH = 5.5;
+  const stand = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.9, standH, 24), mat(0x24170e, 0.6));
+  stand.position.y = FLOOR + standH / 2;
+  const potTop = FLOOR + standH + 4.6;
+  const pot = new THREE.Mesh(new THREE.CylinderGeometry(3.0, 2.3, 4.6, 28), mat(0xd9d2c3, 0.7));
+  pot.position.y = FLOOR + standH + 2.3;
+  const soil = new THREE.Mesh(new THREE.CircleGeometry(2.85, 28).rotateX(-Math.PI / 2), mat(0x20150c, 1));
+  soil.position.y = potTop - 0.12;
+  g.add(stand, pot, soil);
   const rand = rng(11);
   const leafMat = mat(0x2f6b45, 0.7);
   const leafMat2 = mat(0x3d8055, 0.7);
   const leaf = new THREE.SphereGeometry(1, 14, 10);
-  for (let i = 0; i < 15; i++) {
-    const a = (i / 15) * Math.PI * 2 + rand() * 0.5;
-    const tilt = 0.35 + rand() * 0.75;
-    const len = 9 + rand() * 9;
-    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.14, len, 6), leafMat);
+  const count = 13;
+  for (let i = 0; i < count; i++) {
+    // Stems lean towards (-cos a, sin a): keep a within the half-turn facing the room.
+    const a = 0.1 + (i / (count - 1)) * (Math.PI - 0.2) + (rand() - 0.5) * 0.2;
+    const tilt = 0.2 + rand() * 0.6;
+    const len = 6 + rand() * 6;
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.13, len, 6), leafMat);
     const pivot = new THREE.Group();
-    pivot.position.y = FLOOR + 5.2;
-    pivot.rotation.set(0, a, 0);
+    pivot.position.y = potTop - 0.2;
+    pivot.rotation.y = a;
     const arm = new THREE.Group();
     arm.rotation.z = tilt;
     stem.position.y = len / 2;
     const blade = new THREE.Mesh(leaf, rand() < 0.5 ? leafMat : leafMat2);
-    blade.scale.set(1.5 + rand() * 0.8, 0.12, 3.2 + rand() * 1.4);
-    blade.position.y = len + 1.6;
-    blade.rotation.set(0.6, rand() * 0.6, 0.5);
+    blade.scale.set(1.3 + rand() * 0.6, 0.1, 2.4 + rand() * 0.9);
+    blade.position.y = len + 0.2;
+    blade.rotation.set(0, Math.PI / 2, 0.45 + rand() * 0.3); // long axis out along the stem, drooping a little
     arm.add(stem, blade);
     pivot.add(arm);
     g.add(pivot);
@@ -648,7 +681,6 @@ function bookshelf(x, z, length) {
       const h = gap * (0.55 + rand() * 0.3);
       const d = 3.2 + rand() * 1.2;
       const b = box(d, h, t, mat(colors[Math.floor(rand() * colors.length)], 0.75), -0.4, y + 0.35 + h / 2, zc + t / 2);
-      if (rand() < 0.1) b.rotation.x = 0.18;
       g.add(b);
       zc += t + 0.06;
     }
@@ -723,7 +755,7 @@ export function buildRoom() {
   room.add(view);
   const frame = mat(0xefe9dc, 0.6);
   room.add(box(winW + 2, 1, 1, frame, 0, winY + winH / 2 + 0.5, back + 0.5));
-  room.add(box(winW + 3.4, 1.2, 2.2, frame, 0, winY - winH / 2 - 0.6, back + 1.1));
+  room.add(box(winW + 1.6, 1.2, 2.2, frame, 0, winY - winH / 2 - 0.6, back + 1.1));
   for (const x of [-winW / 2 - 0.5, winW / 2 + 0.5, 0]) room.add(box(x === 0 ? 0.5 : 1, winH, 0.8, frame, x, winY, back + 0.4));
   room.add(box(winW, 0.5, 0.8, frame, 0, winY + 2, back + 0.4));
   const cloth = new THREE.MeshStandardMaterial({ map: curtainTexture(), roughness: 1 });
@@ -734,8 +766,9 @@ export function buildRoom() {
   const couch = sofa({ width: 44, color: 0x56616c, seats: 3 });
   couch.position.set(0, 0, -25);
   room.add(couch);
-  room.add(pillow(0xd7a91a, -14.6, FLOOR + 11.2, -25.2, 0.35, 0.12));
-  room.add(pillow(0x2774ae, 14.4, FLOOR + 11.2, -25.2, -0.3, -0.1));
+  const SEAT = FLOOR + 8.2; // top of the sofa's seat cushions
+  room.add(pillow(0xd7a91a, -14.4, SEAT, -24.9, 0.22));
+  room.add(pillow(0x2774ae, 14.6, SEAT, -24.9, -0.2));
   room.add(blob(54, 24, 0, -25));
 
   // armchair to the right of the sofa, turned towards the table
@@ -749,8 +782,8 @@ export function buildRoom() {
   const lamp = floorLamp(-30, -33);
   room.add(lamp, lamp.userData.light);
   room.add(blob(9, 9, -30, -33, 0.5));
-  room.add(plant(31, -38));
-  room.add(blob(12, 12, 31, -38, 0.5));
+  room.add(plant(31, -40));
+  room.add(blob(11, 11, 31, -40, 0.5));
 
   // shelves on the right wall, art on the left and back walls
   room.add(bookshelf(right - 2.9, -10, 44));
@@ -773,13 +806,12 @@ export function buildRoom() {
   skiSet.position.set(left + 6, FLOOR, back + 5.2);
   room.add(skiSet);
   const racket = badmintonRacket();
-  racket.position.set(12.5, FLOOR + 8.5, -20.5);
-  racket.rotation.set(-1.32, 0, 0.5);
+  racket.position.set(9.6, SEAT, -20.9);
+  racket.rotation.y = 1.36; // lengthways along the seat, well clear of the back cushions
   room.add(racket);
 
   // the table the board stands on
   room.add(coffeeTable(), tableThings());
-  room.add(blob(44, 30, 0, 0, 0.45));
 
   // cool light from the window, to rim the pieces and the sofa
   const dusk = new THREE.PointLight(0x7fb0e6, 240, 140, 1.7);
