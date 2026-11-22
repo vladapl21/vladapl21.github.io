@@ -447,86 +447,203 @@ function tableThings() {
 
 // ---------- things on the walls and around the room ----------
 
-// Letters set along an arc, the way they are sewn on a felt college banner:
-// a dark drop shadow, a cream outline, and a gold face that deepens downwards.
+const BANNER_DIM = 0.5; // how bright the banner sits in the dark room
+const VARSITY = "'Graduate', Georgia, 'Times New Roman', serif";
+
+// One sewn-on letter (or word): a dark shadow, a cream felt layer, a gold face.
+function appliqué(c, text, size) {
+  c.lineJoin = 'round';
+  c.fillStyle = 'rgba(8, 36, 60, 0.55)';
+  c.fillText(text, size * 0.03, size * 0.04);
+  c.strokeStyle = '#f3ead2';
+  c.lineWidth = size * 0.085;
+  c.strokeText(text, 0, 0);
+  const face = c.createLinearGradient(0, -size * 0.72, 0, 0);
+  face.addColorStop(0, '#ffe25c');
+  face.addColorStop(0.5, '#ffd100');
+  face.addColorStop(1, '#e2a100');
+  c.fillStyle = face;
+  c.fillText(text, 0, 0);
+}
+
+// Letters set along a shallow arch. Returns the lowest point any letter
+// reaches, so whatever goes underneath can be placed clear of it.
 function archedText(c, text, cx, baseY, radius, size) {
-  c.font = `700 ${size}px Georgia, 'Times New Roman', 'Noto Serif', serif`;
+  c.font = `${size}px ${VARSITY}`;
   c.textAlign = 'center';
   c.textBaseline = 'alphabetic';
-  c.lineJoin = 'round';
-  const gap = size * 0.1;
+  const gap = size * 0.09;
   const widths = [...text].map((ch) => c.measureText(ch).width);
   const total = widths.reduce((a, b) => a + b, 0) + gap * (text.length - 1);
   const centreY = baseY + radius; // centre of the circle the baseline follows
   let along = -total / 2;
+  let lowest = baseY;
   [...text].forEach((ch, i) => {
     const angle = (along + widths[i] / 2) / radius;
     along += widths[i] + gap;
+    const x = cx + Math.sin(angle) * radius;
+    const y = centreY - Math.cos(angle) * radius;
+    lowest = Math.max(lowest, y + (Math.abs(Math.sin(angle)) * widths[i]) / 2);
     c.save();
-    c.translate(cx + Math.sin(angle) * radius, centreY - Math.cos(angle) * radius);
+    c.translate(x, y);
     c.rotate(angle);
-    c.fillStyle = '#0d3252';
-    c.fillText(ch, size * 0.035, size * 0.045);
-    c.strokeStyle = '#f6efd9';
-    c.lineWidth = size * 0.075;
-    c.strokeText(ch, 0, 0);
-    const face = c.createLinearGradient(0, -size * 0.75, 0, 0);
-    face.addColorStop(0, '#ffe04a');
-    face.addColorStop(0.55, '#ffd100');
-    face.addColorStop(1, '#e6a400');
-    c.fillStyle = face;
-    c.fillText(ch, 0, 0);
+    appliqué(c, ch, size);
     c.restore();
   });
+  return lowest + size * 0.08; // allow for the outline and shadow
 }
 
-// A felt banner in the school's colours, draped over the back of the sofa.
-// Plain serif lettering on an arch, not the university's logo.
-// Origin: on the seat, at the foot of the back cushion, facing +z.
-function banner() {
-  const W = 10.6; // width
-  const H = 5.5; // how far it hangs down the front of the cushion
-  const felt = canvasTexture(1024, 532, (c, w, h) => {
+function bannerTexture() {
+  // 1400 x 990 matches the cloth's proportions (10.4 wide, 7.35 long), so nothing is stretched.
+  // The top third lies on top of the cushion; the lettering sits on the part that hangs.
+  return canvasTexture(1400, 990, (c, w, h) => {
     const base = c.createLinearGradient(0, 0, 0, h);
     base.addColorStop(0, '#2b7bb8');
-    base.addColorStop(1, '#205f92');
+    base.addColorStop(1, '#22659b');
     c.fillStyle = base;
     c.fillRect(0, 0, w, h);
     const rand = rng(41);
-    for (let i = 0; i < 7000; i++) { // felt nap
-      c.fillStyle = `rgba(${rand() < 0.5 ? '255,255,255' : '0,20,40'},${rand() * 0.07})`;
+    for (let i = 0; i < 21000; i++) { // felt nap
+      c.fillStyle = `rgba(${rand() < 0.5 ? '255,255,255' : '0,20,40'},${rand() * 0.06})`;
       c.fillRect(rand() * w, rand() * h, 2, 2);
     }
-    // gold border, a second fine line inside it
-    c.strokeStyle = '#ffd100';
-    c.lineWidth = 9;
-    c.strokeRect(22, 22, w - 44, h - 44);
-    c.lineWidth = 2.5;
-    c.strokeRect(38, 38, w - 76, h - 76);
-    archedText(c, 'UCLA', w / 2, 318, 640, 232);
-    // a straight line underneath, between two short rules
-    c.font = "700 44px Georgia, 'Times New Roman', 'Noto Serif', serif";
-    c.textAlign = 'center';
-    c.fillStyle = '#f6efd9';
-    const sub = 'L O S   A N G E L E S';
-    c.fillText(sub, w / 2, 430);
-    const half = c.measureText(sub).width / 2;
-    c.fillStyle = '#ffd100';
-    c.fillRect(w / 2 - half - 130, 412, 96, 5);
-    c.fillRect(w / 2 + half + 34, 412, 96, 5);
+    // a sewn gold band near the edge, and a fine line inside it
+    c.strokeStyle = '#f5c400';
+    c.lineWidth = 13;
+    c.strokeRect(34, 34, w - 68, h - 68);
+    c.strokeStyle = '#f3ead2';
+    c.lineWidth = 3;
+    c.strokeRect(58, 58, w - 116, h - 116);
+
+    const feet = archedText(c, 'UCLA', w / 2, 700, 1700, 280);
+
+    // LOS ANGELES underneath, spaced out, well clear of the arch's feet
+    const size = 56;
+    const text = 'LOS ANGELES';
+    const spacing = 15;
+    c.font = `${size}px ${VARSITY}`;
+    c.textAlign = 'left';
+    const widths = [...text].map((ch) => c.measureText(ch).width);
+    const total = widths.reduce((a, b) => a + b, 0) + spacing * (text.length - 1);
+    const baseline = Math.min(h - 104, feet + 46 + size * 0.72);
+    let x = w / 2 - total / 2;
+    c.fillStyle = '#f3ead2';
+    [...text].forEach((ch, i) => {
+      c.fillText(ch, x, baseline);
+      x += widths[i] + spacing;
+    });
+    // a short gold rule either side of it, level with the middle of the letters
+    const mid = baseline - size * 0.36;
+    c.fillStyle = '#f5c400';
+    c.fillRect(w / 2 - total / 2 - 150, mid - 3, 110, 6);
+    c.fillRect(w / 2 + total / 2 + 40, mid - 3, 110, 6);
   });
-  const face = new THREE.MeshStandardMaterial({ map: felt, roughness: 1, emissive: 0xffffff, emissiveMap: felt, emissiveIntensity: 0.2 });
-  const edge = mat(0x205f92, 1);
+}
+
+// A felt banner thrown over the back of the sofa. It is a real cloth surface:
+// it lies on top of the back cushion, rounds the cushion's front edge, then
+// hangs down the front in folds that deepen towards an uneven hem.
+// Plain varsity lettering, not the university's logo.
+// Origin: on the seat, at the foot of the back cushion, facing +z.
+function banner() {
+  const W = 10.4;
+  const LEAN = 0.16; // how far the sofa's back cushions lean
+  const sinL = Math.sin(LEAN);
+  const cosL = Math.cos(LEAN);
+  // Work in a frame that leans with the cushion: `a` points out of its front
+  // face, `b` up along it. O is the middle of that face.
+  const O = { y: 3.207, z: -0.617 };
+  const TOP = 3.4; // cushion's top edge, in b
+  const CORNER = 0.9; // radius of the cushion's rounded edge
+  const GAP = 0.06; // cloth sits this far off the cushion
+  const BACK = 1.3; // length lying on top of the cushion
+  const DROP = 4.75; // length hanging down the front
+  const turn = CORNER + GAP;
+  const arcLen = (Math.PI / 2) * turn;
+  const total = BACK + arcLen + DROP;
+
+  // Point on the cloth's centre line, s along it from the back edge, with its outward normal.
+  const profile = (s) => {
+    if (s < BACK) return [-CORNER - (BACK - s), TOP + GAP, 0, 1];
+    if (s < BACK + arcLen) {
+      const t = (s - BACK) / turn;
+      return [-CORNER + Math.sin(t) * turn, TOP - CORNER + Math.cos(t) * turn, Math.sin(t), Math.cos(t)];
+    }
+    return [GAP, TOP - CORNER - (s - BACK - arcLen), 1, 0];
+  };
+
+  const NU = 84;
+  const NV = 60;
+  const pos = [];
+  const uv = [];
+  const index = [];
+  const printFrom = 0.2; // the print runs almost the whole length of the cloth
+  for (let j = 0; j <= NV; j++) {
+    for (let i = 0; i <= NU; i++) {
+      const u = i / NU;
+      const m = (j / NV) * total; // position along the cloth itself
+      // thrown on, not hung: it sits slightly askew, so one side hangs lower
+      const s = m + 0.5 * (u - 0.5) + 0.07 * Math.sin(u * 8.8 + 1);
+      let [a, b, na, nb] = profile(s);
+      // folds: none on top of the cushion, deepening down the hanging part
+      const hang = Math.min(1, Math.max(0, (s - BACK - arcLen * 0.5) / DROP));
+      const depth = 0.012 + 0.36 * Math.pow(hang, 1.1);
+      // a few broad folds, some finer ones, and a slight diagonal pull from being thrown on
+      const wave = 0.55 * Math.sin(u * 16.3 + 0.6) + 0.3 * Math.sin(u * 33.3 + 2.8) + 0.25 * Math.sin(u * 6.9 + 5) + 0.22 * Math.sin((u + 0.55 * hang) * 22 + 1.3);
+      const out = depth * (1.15 + wave);
+      a += na * out;
+      b += nb * out;
+      // the folds take up a little width, more so lower down
+      const x = (u - 0.5) * W * (1 - 0.06 * hang);
+      pos.push(x, O.y + a * sinL + b * cosL, O.z + a * cosL - b * sinL);
+      uv.push(u, Math.min(1, 1 - (m - printFrom) / (total - printFrom)));
+    }
+  }
+  for (let j = 0; j < NV; j++) {
+    for (let i = 0; i < NU; i++) {
+      const p = j * (NU + 1) + i;
+      index.push(p, p + NU + 1, p + 1, p + 1, p + NU + 1, p + NU + 2);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geometry.setIndex(index);
+  geometry.computeVertexNormals();
+
+  // The folds are shaded once, here, as if lit softly from the front left,
+  // and stored in the cloth itself. A real lamp aimed at the banner would
+  // have to be worked out for every surface in the room on every frame.
+  const normal = geometry.getAttribute('normal');
+  const light = new THREE.Vector3(-0.8, 0.42, 0.55).normalize();
+  const shade = [];
+  for (let k = 0; k < normal.count; k++) {
+    const facing = Math.max(0, normal.getX(k) * light.x + normal.getY(k) * light.y + normal.getZ(k) * light.z);
+    const v = BANNER_DIM * Math.max(0.24, 0.3 + 1.4 * (facing - 0.35));
+    shade.push(v, v, v);
+  }
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(shade, 3));
+  const cloth = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ map: bannerTexture(), vertexColors: true, side: THREE.DoubleSide }));
+
+  // Its shadow on the cushion behind: a soft dark patch a little larger than the cloth.
+  const shadowMap = canvasTexture(256, 256, (c, w, h) => {
+    c.clearRect(0, 0, w, h);
+    c.filter = 'blur(14px)';
+    c.fillStyle = '#000';
+    c.fillRect(34, 20, w - 68, h - 54);
+  });
+  const shadowH = DROP + 0.9;
+  const shadow = new THREE.Mesh(
+    new THREE.PlaneGeometry(W + 1.5, shadowH),
+    new THREE.MeshBasicMaterial({ map: shadowMap, transparent: true, opacity: 0.6, depthWrite: false }),
+  );
+  const sb = TOP - CORNER - shadowH / 2 + 0.25; // centre of the patch, in the cushion's frame
+  const sa = 0.025;
+  shadow.position.set(0.2, O.y + sa * sinL + sb * cosL, O.z + sa * cosL - sb * sinL);
+  shadow.rotation.x = -LEAN;
+
   const g = new THREE.Group();
-  const lean = new THREE.Group();
-  lean.rotation.x = -0.16; // the same lean as the sofa's back cushions
-  const front = new THREE.Mesh(new THREE.BoxGeometry(W, H, 0.14), [edge, edge, edge, edge, face, edge]);
-  front.position.set(0, 0.95 + H / 2, 0.2);
-  front.receiveShadow = true;
-  lean.add(front);
-  // the part folded over the top of the cushion
-  lean.add(box(W, 0.14, 1.5, edge, 0, 0.95 + H + 0.07, 0.2 - 0.68));
-  g.add(lean);
+  g.add(shadow, cloth);
   return g;
 }
 

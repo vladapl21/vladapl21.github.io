@@ -40,5 +40,5 @@ The room is dark on purpose, with one lamp on the board. Drag around to find: a 
 ## Notes
 
 - `#plain` in the address bar shows everything as an ordinary page. Browsers without WebGL get that page automatically.
-- Colours are UCLA blue (`#2774AE`) and gold (`#FFD100`). The banner spells the name in a plain serif; the site does not use UCLA's logos.
-- Fonts are Sofia Sans and Sofia Sans Extra Condensed (SIL Open Font License), served from `fonts/`.
+- Colours are UCLA blue (`#2774AE`) and gold (`#FFD100`). The banner spells the name in a plain varsity face; the site does not use UCLA's logos.
+- Fonts are Sofia Sans, Sofia Sans Extra Condensed and Graduate (all SIL Open Font License), served from `fonts/`. Graduate is only used for the lettering on the banner.

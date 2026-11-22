@@ -14,6 +14,13 @@
   font-display: swap;
 }
 
+/* Graduate (SIL Open Font License): only used for the lettering sewn on the banner. */
+@font-face {
+  font-family: 'Graduate';
+  src: url('../fonts/graduate.woff2') format('woff2');
+  font-display: swap;
+}
+
 :root {
   --blue: #2774ae;
   --sky: #8bb8e8;

@@ -237,9 +237,9 @@ $('#year').textContent = new Date().getFullYear();
 $('#tracked').textContent = `${pieces.length} pieces tracked`;
 
 try {
-  // The pennant on the wall is drawn with the display font, so wait for it (briefly).
+  // The banner's lettering is drawn onto a texture, so its font has to be loaded first.
   await Promise.race([
-    document.fonts.load('800 100px "Sofia Sans Extra Condensed"'),
+    document.fonts.load('100px "Graduate"'),
     new Promise((resolve) => setTimeout(resolve, 1500)),
   ]).catch(() => {});
   const { createBoard } = await import('./board.js');
