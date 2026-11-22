@@ -33,6 +33,21 @@ Then go to http://localhost:8000. Opening `index.html` straight from disk will n
 
 There is nothing to build. GitHub Pages serves the `main` branch as it is, and `netlify.toml` tells Netlify to do the same (publish the repo root, no build command). Once the repo is linked to a Netlify site, every push to `main` updates both.
 
+## Speed
+
+The site is tuned to start quickly and stay smooth on phones:
+
+- The room's several hundred objects are fused into a few dozen, and each chess piece is one object.
+- Shadows are redrawn only on frames where a piece moves.
+- Phones and tablets get a lighter version: lower resolution, smaller textures and shadow map, simpler materials.
+- If a device still can't keep up, the resolution steps down automatically.
+- The scene is uploaded to the graphics card before the intro starts, then fades in.
+- Drawing stops while a dialog covers the scene.
+
+## Screenshots
+
+Project screenshots live in `img/projects/` and are listed under `media` in `js/content.js`. They load only when their section is opened.
+
 ## Easter eggs
 
 The room is dark on purpose, with one lamp on the board. Drag around to find: a UCLA banner over the back of the sofa, eggs Benedict, an ace-king of spades with poker chips, a dartboard, skis in the corner, a badminton racket and shuttlecock, a model racing car, a bowl of golf balls, a chess clock, and the moon in the window. They are all built in `js/room.js`.

@@ -3,8 +3,16 @@
 // extruded head, the rook its battlements, the king its cross.
 
 import * as THREE from '../vendor/three.js';
+import { mergeGeometries } from '../vendor/three.js';
 
-const SEGMENTS = 56;
+const cache = new Map();
+let SEGMENTS = 56;
+
+// Fewer facets round each piece for slower devices. Call before building any piece.
+export function setDetail(segments) {
+  SEGMENTS = segments;
+  cache.clear();
+}
 
 const lathe = (points) =>
   new THREE.LatheGeometry(points.map(([r, y]) => new THREE.Vector2(r, y)), SEGMENTS);
@@ -131,11 +139,17 @@ function kingCross() {
 
 const extras = { knight: () => [knightHead()], rook: rookBattlements, queen: queenPearls, king: kingCross };
 
-const cache = new Map();
 
-function geometriesFor(type) {
+// One geometry per piece type: the turned body and any extra parts fused
+// together, so each piece on the board is a single object to draw.
+function geometryFor(type) {
   if (!cache.has(type)) {
-    cache.set(type, [lathe(profiles[type]()), ...(extras[type] ? extras[type]() : [])]);
+    const parts = [lathe(profiles[type]()), ...(extras[type] ? extras[type]() : [])].map((g) => {
+      const flat = g.index ? g.toNonIndexed() : g;
+      for (const name of Object.keys(flat.attributes)) if (!['position', 'normal', 'uv'].includes(name)) flat.deleteAttribute(name);
+      return flat;
+    });
+    cache.set(type, parts.length > 1 ? mergeGeometries(parts) : parts[0]);
   }
   return cache.get(type);
 }
@@ -143,12 +157,10 @@ function geometriesFor(type) {
 // Returns a group standing on y = 0, centred on its square.
 export function buildPiece(type, material) {
   const group = new THREE.Group();
-  for (const geometry of geometriesFor(type)) {
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    group.add(mesh);
-  }
+  const mesh = new THREE.Mesh(geometryFor(type), material);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  group.add(mesh);
   group.scale.setScalar(0.94);
   return group;
 }

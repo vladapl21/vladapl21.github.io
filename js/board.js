@@ -4,7 +4,7 @@
 
 import * as THREE from '../vendor/three.js';
 import { OrbitControls, RoomEnvironment } from '../vendor/three.js';
-import { buildPiece } from './pieces.js';
+import { buildPiece, setDetail } from './pieces.js';
 import { buildRoom, TABLE_TOP } from './room.js';
 import { FILES, startPosition } from './chess.js';
 
@@ -21,13 +21,23 @@ const IDLE_RETURN = 7000; // ms without touching the camera before it goes home
 const POPUP_EVERY = 2800; // ms between pop-ups while nobody is interacting
 
 export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, insets: firstInsets, anchor, onSelect, onHover, onFps }) {
+  // Phones and tablets get a lighter version of the scene: lower resolution,
+  // a smaller shadow map, simpler materials and fewer facets on the pieces.
+  const lite = window.matchMedia('(pointer: coarse)').matches || Math.min(window.innerWidth, window.innerHeight) < 700;
+  const minRatio = lite ? 0.85 : 1;
+  let pixelRatio = Math.max(minRatio, Math.min(window.devicePixelRatio || 1, lite ? 1.5 : 2));
+  if (lite) setDetail(36);
+
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(pixelRatio);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.0;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
+  // Shadows are redrawn only on frames where a piece has moved (see the frame loop).
+  renderer.shadowMap.autoUpdate = false;
+  renderer.shadowMap.needsUpdate = true;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x03090f);
@@ -61,7 +71,7 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
   key.position.set(-6, 29, 8);
   key.target.position.set(0, 0, 0);
   key.castShadow = true;
-  key.shadow.mapSize.set(2048, 2048);
+  key.shadow.mapSize.set(lite ? 1024 : 2048, lite ? 1024 : 2048);
   key.shadow.camera.near = 6;
   key.shadow.camera.far = 60;
   key.shadow.bias = -0.0004;
@@ -70,12 +80,12 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
   scene.add(key, key.target);
   scene.add(new THREE.HemisphereLight(0x9fc4ea, 0x2a2018, 0.11));
 
-  scene.add(buildRoom());
-  scene.add(buildBoard(renderer, reflections));
+  scene.add(buildRoom({ lite }));
+  scene.add(buildBoard(renderer, reflections, lite));
 
   // ---- pieces: all 32, some of which carry a section ----
-  const ivory = new THREE.MeshPhysicalMaterial({ color: 0xebe3d0, roughness: 0.34, clearcoat: 0.5, clearcoatRoughness: 0.25, envMap: reflections, envMapIntensity: 0.3 });
-  const navy = new THREE.MeshPhysicalMaterial({ color: 0x123a60, roughness: 0.28, metalness: 0.15, clearcoat: 0.7, clearcoatRoughness: 0.2, envMap: reflections, envMapIntensity: 0.55 });
+  const ivory = new THREE.MeshPhysicalMaterial({ color: 0xebe3d0, roughness: lite ? 0.28 : 0.34, clearcoat: lite ? 0 : 0.5, clearcoatRoughness: 0.25, envMap: reflections, envMapIntensity: 0.3 });
+  const navy = new THREE.MeshPhysicalMaterial({ color: 0x123a60, roughness: lite ? 0.22 : 0.28, metalness: 0.15, clearcoat: lite ? 0 : 0.7, clearcoatRoughness: 0.2, envMap: reflections, envMapIntensity: 0.55 });
   const gold = new THREE.Color(0xffd100);
 
   const playIntro = !reducedMotion && Boolean(opening);
@@ -160,21 +170,27 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
   overlay.append(leaderSvg);
 
   // ---- tweens ----
+  // Animations run on their own clock, which advances by at most 120 ms a
+  // frame. One long stall then costs an animation a moment, not a visible jump.
+  let clock = 0;
   const tweens = new Set();
-  function tween({ duration = 600, delay = 0, ease = easeInOut, update, done }) {
+  function tween({ duration = 600, delay = 0, ease = easeInOut, update, done, piece = false }) {
     if (reducedMotion) {
       update(1);
       if (done) done();
+      shadowFrames = 2;
       return { cancel() {} };
     }
-    const t = { start: performance.now() + delay, duration, ease, update, done };
+    const t = { start: clock + delay, duration, ease, update, done, piece };
     tweens.add(t);
     return { cancel: () => tweens.delete(t), finish: () => { if (tweens.delete(t)) { update(1); if (done) done(); } } };
   }
+  let shadowFrames = 2; // frames left on which the shadows must be redrawn
   function stepTweens(now) {
     for (const t of [...tweens]) {
       const k = (now - t.start) / t.duration;
       if (k < 0) continue;
+      if (t.piece) shadowFrames = 2;
       const c = Math.min(1, k);
       t.update(t.ease(c));
       if (c === 1) {
@@ -310,9 +326,11 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
   function resize() {
     width = canvas.clientWidth || window.innerWidth;
     height = canvas.clientHeight || window.innerHeight;
+    renderer.setPixelRatio(pixelRatio);
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
+    for (const m of tracked) m.labelW = null;
     if (flying) return;
     const pose = selected ? focusPose(byId.get(selected)) : touched ? null : homePose();
     if (pose) {
@@ -326,11 +344,12 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
   function refresh() {
     const hot = hovered || popup;
     for (const m of tracked) {
-      const k = m.side === 'black' ? 0.55 : 1; // gold reads much stronger on the dark pieces
+      const k = m.side === 'black' ? 0.3 : 1; // gold reads much stronger on the dark pieces
       m.glowTo = (m.id === selected ? 0.18 : m.id === hot ? 0.09 : 0) * k;
       m.el.classList.toggle('is-selected', m.id === selected);
       m.el.classList.toggle('is-hot', m.id === hovered);
       m.el.classList.toggle('is-popup', m.id === popup && !hovered);
+      m.labelW = null; // its label may have changed size
     }
     const hotMan = byId.get(hot);
     if (hotMan) hoverMarker.position.set(hotMan.home.x, 0.006, hotMan.home.z);
@@ -352,6 +371,7 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
       const toR = prev.baseRot + (fromR - prev.baseRot > Math.PI ? turn : 0);
       tween({
         duration: 500,
+        piece: true,
         update: (k) => {
           prev.group.position.y = fromY * (1 - k);
           prev.group.rotation.y = fromR + (toR - fromR) * k;
@@ -366,7 +386,7 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
     refresh();
     if (man) {
       const fromY = man.group.position.y;
-      tween({ duration: 600, ease: easeOut, update: (k) => { man.group.position.y = fromY + (LIFT - fromY) * k; } });
+      tween({ duration: 600, ease: easeOut, piece: true, update: (k) => { man.group.position.y = fromY + (LIFT - fromY) * k; } });
       flyTo(focusPose(man));
     } else {
       touched = false;
@@ -404,7 +424,7 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
     nextPopup = now + POPUP_EVERY;
     refresh();
     const man = byId.get(popup);
-    tween({ duration: 520, ease: (t) => t, update: (k) => { if (man.id !== selected) man.group.position.y = Math.sin(Math.PI * k) * 0.3; } });
+    tween({ duration: 520, ease: (t) => t, piece: true, update: (k) => { if (man.id !== selected) man.group.position.y = Math.sin(Math.PI * k) * 0.3; } });
   }
 
   // Called when the panel opens, closes or the window changes: the free area
@@ -472,12 +492,15 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
   // ---- the opening, then a detection sweep ----
   let intro = [];
   let scanTimers = [];
+  let begun = false; // has the first frame been drawn?
+  let skipIntro = false; // the visitor opened something before it could start
 
   function movePiece(man, { delay, hop }) {
     const from = man.group.position.clone();
     return tween({
       duration: hop ? 620 : 520,
       delay,
+      piece: true,
       update: (k) => {
         man.group.position.lerpVectors(from, man.home, k);
         man.group.position.y = Math.sin(Math.PI * k) * (hop ? 0.95 : 0.1);
@@ -495,13 +518,17 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
   function scan() {
     const order = [...tracked].sort((a, b) => a.rect.x - b.rect.x);
     order.forEach((m, i) => {
-      scanTimers.push(setTimeout(() => m.el.classList.add('is-scan'), i * 80));
+      scanTimers.push(setTimeout(() => { m.labelW = null; m.el.classList.add('is-scan'); }, i * 80));
       scanTimers.push(setTimeout(() => m.el.classList.remove('is-scan'), i * 80 + 1300));
     });
   }
 
   // Jump to the end of the intro (used when the visitor acts before it finishes).
   function settle() {
+    if (!begun) {
+      skipIntro = true;
+      for (const man of men.values()) if (man.id !== selected) man.group.position.copy(man.home);
+    }
     for (const t of intro) t.finish && t.finish();
     intro = [];
     for (const t of scanTimers) clearTimeout(t);
@@ -511,7 +538,6 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
   }
 
   function start() {
-    resize();
     const home = homePose();
     setShift(home.shift, true);
     if (!playIntro) {
@@ -533,6 +559,8 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
   }
 
   // ---- frame loop ----
+  // Positions the gold boxes over their pieces. Values are rounded and written
+  // to the page only when they change, so a still box costs nothing.
   const corner = new THREE.Vector3();
   function updateBoxes() {
     for (const m of tracked) {
@@ -548,17 +576,26 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
       }
       const b = m.rect;
       b.x = x0 - 3; b.y = y0 - 3; b.w = x1 - x0 + 6; b.h = y1 - y0 + 6;
-      m.el.style.transform = `translate3d(${b.x.toFixed(1)}px, ${b.y.toFixed(1)}px, 0)`;
-      m.el.style.width = `${b.w.toFixed(1)}px`;
-      m.el.style.height = `${b.h.toFixed(1)}px`;
-      m.el.classList.toggle('tag-below', b.y < 34);
+      const d = (m.drawn ||= {});
+      const x = Math.round(b.x * 2) / 2;
+      const y = Math.round(b.y * 2) / 2;
+      const w = Math.round(b.w);
+      const h = Math.round(b.h);
+      if (x !== d.x || y !== d.y) {
+        m.el.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+        d.x = x; d.y = y;
+      }
+      if (w !== d.w) { m.el.style.width = `${w}px`; d.w = w; }
+      if (h !== d.h) { m.el.style.height = `${h}px`; d.h = h; }
+      const below = b.y < 34;
+      if (below !== d.below) { m.el.classList.toggle('tag-below', below); d.below = below; }
       // Keep a visible label on screen: slide it sideways if it would run off an edge.
       const c = m.el.classList;
       if (c.contains('is-popup') || c.contains('is-hot') || c.contains('is-scan') || c.contains('is-selected')) {
-        const lw = m.labelEl.offsetWidth;
-        let dx = Math.min(0, width - 8 - (b.x - 2 + lw));
-        dx = Math.max(dx, 8 - (b.x - 2));
-        m.labelEl.style.transform = `translateX(${dx.toFixed(0)}px)`;
+        if (m.labelW == null) m.labelW = m.labelEl.offsetWidth;
+        let dx = Math.min(0, width - 8 - (b.x - 2 + m.labelW));
+        dx = Math.round(Math.max(dx, 8 - (b.x - 2)));
+        if (dx !== d.dx) { m.labelEl.style.transform = `translateX(${dx}px)`; d.dx = dx; }
       }
     }
     const sel = byId.get(selected);
@@ -568,11 +605,17 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
       const x = b.x + b.w;
       const y = b.y + Math.min(b.h / 2, 40);
       const midX = Math.min(a.x - 24, Math.max(x + 16, a.x - 70));
-      leader.setAttribute('points', `${x},${y} ${midX},${a.y} ${a.x},${a.y}`);
-      leaderSvg.style.opacity = a.x - x > 30 ? 1 : 0;
+      const points = `${x.toFixed(0)},${y.toFixed(0)} ${midX.toFixed(0)},${a.y.toFixed(0)} ${a.x.toFixed(0)},${a.y.toFixed(0)}`;
+      if (points !== leaderPoints) { leader.setAttribute('points', points); leaderPoints = points; }
+      setLeader(a.x - x > 30 ? 1 : 0);
     } else {
-      leaderSvg.style.opacity = 0;
+      setLeader(0);
     }
+  }
+  let leaderPoints = '';
+  let leaderShown = -1;
+  function setLeader(v) {
+    if (v !== leaderShown) { leaderSvg.style.opacity = v; leaderShown = v; }
   }
 
   let lastConf = 0;
@@ -598,7 +641,9 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
     const dt = Math.min(0.05, elapsed);
     const smooth = (rate) => 1 - Math.exp(-rate * elapsed);
     last = now;
-    stepTweens(now);
+    clock += Math.min(elapsed, 0.12) * 1000;
+    stepTweens(clock);
+    adaptResolution(elapsed);
 
     // Left alone for a while after being dragged: go back to the home view.
     if (touched && !selected && !holding && !flying && !reducedMotion && now - lastTouch > IDLE_RETURN) {
@@ -611,13 +656,17 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
     } else {
       controls.autoRotate = drifting;
       if (drifting) controls.autoRotateSpeed = 0.42 * Math.sin(((now - driftStart) / 1000) * ((Math.PI * 2) / 24));
-      controls.update();
+      controls.update(dt); // timed, so the drift is the same speed on every screen
     }
 
     stepPopups(now);
 
     const sel = byId.get(selected);
-    if (sel && !reducedMotion) sel.group.rotation.y += dt * 0.45;
+    if (sel && !reducedMotion) {
+      sel.group.rotation.y += dt * 0.45;
+      // its shadow turns with it; on phones, every other frame is enough
+      if (!lite || frames % 2 === 0) shadowFrames = Math.max(shadowFrames, 1);
+    }
     for (const m of tracked) {
       m.glow += (m.glowTo - m.glow) * smooth(8);
       m.material.emissiveIntensity = m.glow;
@@ -631,6 +680,10 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
     view.y += (view.toY - view.y) * smooth(6);
     camera.setViewOffset(width, height, view.x, view.y, width, height);
 
+    if (shadowFrames > 0) {
+      renderer.shadowMap.needsUpdate = true;
+      shadowFrames--;
+    }
     renderer.render(scene, camera);
     updateBoxes();
     jitter(now);
@@ -643,11 +696,47 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
     }
   }
 
+  // If the device can't keep up, lower the resolution a step at a time. It
+  // never goes back up, so it cannot flip back and forth.
+  let slow = 0;
+  let sampled = 0;
+  function adaptResolution(elapsed) {
+    if (elapsed > 0.25 || pixelRatio <= minRatio) return; // ignore pauses (tab in the background)
+    slow += elapsed;
+    if (++sampled < 30) return;
+    const average = slow / sampled;
+    slow = 0;
+    sampled = 0;
+    if (average > 1 / 42) {
+      pixelRatio = Math.max(minRatio, pixelRatio - 0.25);
+      renderer.setPixelRatio(pixelRatio);
+      renderer.setSize(width, height, false);
+    }
+  }
+
   window.addEventListener('resize', resize);
   // ?debug in the address exposes the camera, for positioning shots by hand.
-  if (new URLSearchParams(location.search).has('debug')) window.__scene = { camera, controls, brighten: () => { scene.add(new THREE.HemisphereLight(0xffffff, 0x888888, 1.6)); scene.fog = null; }, hold: () => { touched = true; lastTouch = Infinity; drifting = false; } };
-  start();
-  requestAnimationFrame(frame);
+  if (new URLSearchParams(location.search).has('debug')) window.__scene = { camera, controls, renderer, brighten: () => { scene.add(new THREE.HemisphereLight(0xffffff, 0x888888, 1.6)); scene.fog = null; }, hold: () => { touched = true; lastTouch = Infinity; drifting = false; } };
+  // Start-up: get everything onto the graphics card first, draw one frame,
+  // then fade the scene in and only then start the intro, so it plays smoothly.
+  resize();
+  const begin = () => {
+    begun = true;
+    if (skipIntro) goLive();
+    else start();
+    shadowFrames = 2;
+    last = performance.now();
+    fpsAt = last;
+    canvas.classList.add('is-ready');
+    requestAnimationFrame(frame);
+  };
+  const compiled = renderer.compileAsync ? renderer.compileAsync(scene, camera) : Promise.resolve();
+  Promise.race([compiled, new Promise((resolve) => setTimeout(resolve, 4000))])
+    .catch(() => {})
+    .then(() => {
+      renderer.render(scene, camera);
+      requestAnimationFrame(begin);
+    });
 
   return {
     select,
@@ -657,7 +746,7 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
     setActive(on) {
       if (on === active) return;
       active = on;
-      if (on) {
+      if (on && begun) {
         last = performance.now();
         fpsAt = last;
         frames = 0;
@@ -668,7 +757,7 @@ export function createBoard({ canvas, overlay, pieces, opening, reducedMotion, i
   };
 }
 
-function buildBoard(renderer, reflections) {
+function buildBoard(renderer, reflections, lite) {
   const group = new THREE.Group();
 
   const c = document.createElement('canvas');
@@ -696,7 +785,7 @@ function buildBoard(renderer, reflections) {
 
   const top = new THREE.Mesh(
     new THREE.BoxGeometry(8, 0.03, 8).translate(0, -0.015, 0),
-    new THREE.MeshPhysicalMaterial({ map, roughness: 0.38, clearcoat: 0.35, clearcoatRoughness: 0.3, envMap: reflections, envMapIntensity: 0.25 }),
+    new THREE.MeshPhysicalMaterial({ map, roughness: 0.38, clearcoat: lite ? 0 : 0.35, clearcoatRoughness: 0.3, envMap: reflections, envMapIntensity: 0.25 }),
   );
   top.receiveShadow = true;
   group.add(top);
@@ -704,7 +793,7 @@ function buildBoard(renderer, reflections) {
   const frameHeight = -TABLE_TOP - 0.03;
   const frame = new THREE.Mesh(
     new THREE.BoxGeometry(8.9, frameHeight, 8.9),
-    new THREE.MeshPhysicalMaterial({ color: 0x06304d, roughness: 0.35, metalness: 0.25, clearcoat: 0.5, envMap: reflections, envMapIntensity: 0.3 }),
+    new THREE.MeshPhysicalMaterial({ color: 0x06304d, roughness: 0.35, metalness: 0.25, clearcoat: lite ? 0 : 0.5, envMap: reflections, envMapIntensity: 0.3 }),
   );
   frame.position.y = -0.03 - frameHeight / 2;
   frame.castShadow = true;

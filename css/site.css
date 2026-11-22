@@ -62,7 +62,8 @@ h1, h2, h3, p, ul, figure { margin: 0; }
 body[data-mode='board'] { overflow: hidden; height: 100%; }
 
 #scene, #overlay { position: fixed; inset: 0; width: 100%; height: 100%; }
-#scene { display: block; touch-action: none; cursor: grab; outline: none; }
+#scene { display: block; touch-action: none; cursor: grab; outline: none; opacity: 0; transition: opacity 0.7s; }
+#scene.is-ready { opacity: 1; }
 #scene:active { cursor: grabbing; }
 #scene.is-pointing { cursor: pointer; }
 #overlay { pointer-events: none; overflow: hidden; }
@@ -299,6 +300,23 @@ li::marker { color: var(--gold); }
   font-variant-numeric: tabular-nums;
   pointer-events: none;
 }
+
+/* screenshots and clips inside a section */
+.media { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem 0.6rem; }
+.shot { min-width: 0; }
+.shot-wide { grid-column: 1 / -1; }
+.shot img, .shot video { display: block; width: 100%; height: auto; background: var(--night); border: 1px solid rgba(139, 184, 232, 0.3); }
+.shot-open { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; }
+.shot-open:hover img, .shot-open:focus-visible img { border-color: var(--gold); }
+.shot:not(.shot-wide) img { aspect-ratio: 4 / 3; object-fit: cover; object-position: top left; }
+.shot figcaption { margin-top: 0.3rem; color: var(--sky); font-size: 0.8125rem; line-height: 1.35; }
+.plain-group .media { max-width: 40rem; }
+
+#zoom { width: min(1500px, 96vw); height: min(1000px, 94vh); }
+#zoom h2 { font: 600 1rem/1.3 var(--text); }
+#zoom-count { font-size: 0.875rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#zoom img { flex: 1; min-height: 0; width: 100%; object-fit: contain; background: var(--night); }
+#zoom header { gap: 0.6rem; }
 
 /* demo dialog */
 dialog {

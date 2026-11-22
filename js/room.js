@@ -4,7 +4,7 @@
 // The board's base sits at y = TABLE_TOP; everything else hangs off that.
 
 import * as THREE from '../vendor/three.js';
-import { RoundedBoxGeometry } from '../vendor/three.js';
+import { RoundedBoxGeometry, mergeGeometries } from '../vendor/three.js';
 
 export const TABLE_TOP = -0.345;
 const TABLE_HEIGHT = 8.4;
@@ -13,11 +13,18 @@ export const ROOM = { left: -64, right: 64, back: -46, front: 78, height: 54 };
 
 // ---------- small helpers ----------
 
-function canvasTexture(w, h, draw, { repeat, srgb = true } = {}) {
+// Set by buildRoom: phones and tablets get smaller textures.
+let lite = false;
+
+// Draws a texture. `draw` always works in w x h units; `scale` shrinks the
+// real canvas, which makes it quicker to draw and lighter to hold.
+function canvasTexture(w, h, draw, { repeat, srgb = true, scale = lite ? Math.min(1, 768 / Math.max(w, h)) : 1 } = {}) {
   const c = document.createElement('canvas');
-  c.width = w;
-  c.height = h;
-  draw(c.getContext('2d'), w, h);
+  c.width = Math.round(w * scale);
+  c.height = Math.round(h * scale);
+  const ctx = c.getContext('2d');
+  ctx.scale(scale, scale);
+  draw(ctx, w, h);
   const t = new THREE.CanvasTexture(c);
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   if (repeat) {
@@ -37,7 +44,41 @@ function rng(seed) {
   };
 }
 
-const mat = (color, roughness = 0.8, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness, ...extra });
+// Plain coloured materials are shared: asking for the same colour and finish
+// twice returns the same material, which lets the meshes using it be merged.
+const materials = new Map();
+function mat(color, roughness = 0.8, extra = {}) {
+  const key = `${new THREE.Color(color).getHexString()}|${roughness}|${JSON.stringify(extra)}`;
+  if (!materials.has(key)) materials.set(key, new THREE.MeshStandardMaterial({ color, roughness, ...extra }));
+  return materials.get(key);
+}
+
+// Everything in the room stands still, so meshes that share a material are
+// fused into one. Several hundred separate objects become a few dozen.
+function mergeStatic(root) {
+  root.updateMatrixWorld(true);
+  const buckets = new Map();
+  const merged = [];
+  root.traverse((o) => {
+    const m = o.material;
+    if (!o.isMesh || Array.isArray(m) || !m.isMeshStandardMaterial || m.transparent || m.vertexColors) return;
+    const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+    for (const name of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(name)) g.deleteAttribute(name);
+    if (!g.attributes.normal || !g.attributes.uv) return;
+    g.applyMatrix4(o.matrixWorld);
+    const key = `${m.uuid}|${o.castShadow}|${o.receiveShadow}`;
+    if (!buckets.has(key)) buckets.set(key, { material: m, cast: o.castShadow, receive: o.receiveShadow, parts: [] });
+    buckets.get(key).parts.push(g);
+    merged.push(o);
+  });
+  for (const o of merged) o.removeFromParent();
+  for (const { material, cast, receive, parts } of buckets.values()) {
+    const mesh = new THREE.Mesh(parts.length > 1 ? mergeGeometries(parts) : parts[0], material);
+    mesh.castShadow = cast;
+    mesh.receiveShadow = receive;
+    root.add(mesh);
+  }
+}
 
 function box(w, h, d, material, x, y, z, { round = 0, cast = false } = {}) {
   const g = round ? new RoundedBoxGeometry(w, h, d, 4, round) : new THREE.BoxGeometry(w, h, d);
@@ -102,7 +143,7 @@ function rugTexture() {
     g.fillRect(0, 0, w, h);
     const rand = rng(7);
     // woven speckle
-    for (let i = 0; i < 9000; i++) {
+    for (let i = 0; i < (lite ? 2500 : 6000); i++) {
       g.fillStyle = `rgba(${rand() < 0.5 ? '255,255,255' : '0,0,0'},${rand() * 0.05})`;
       g.fillRect(rand() * w, rand() * h, 2, 2);
     }
@@ -215,7 +256,7 @@ function coffeeTable() {
   const g = new THREE.Group();
   const wood = new THREE.MeshPhysicalMaterial({
     map: woodTexture({ base: '#6b4226', dark: '#5a361f', light: '#7a4e2f', planks: 5, seed: 3 }),
-    roughness: 0.42, clearcoat: 0.35, clearcoatRoughness: 0.35,
+    roughness: 0.42, clearcoat: lite ? 0 : 0.35, clearcoatRoughness: 0.35,
   });
   const top = box(31, 0.9, 20, wood, 0, TABLE_TOP - 0.45, 0, { round: 0.22, cast: true });
   g.add(top);
@@ -496,14 +537,14 @@ function archedText(c, text, cx, baseY, radius, size) {
 function bannerTexture() {
   // 1400 x 990 matches the cloth's proportions (10.4 wide, 7.35 long), so nothing is stretched.
   // The top third lies on top of the cushion; the lettering sits on the part that hangs.
-  return canvasTexture(1400, 990, (c, w, h) => {
+  const draw = (c, w, h) => {
     const base = c.createLinearGradient(0, 0, 0, h);
     base.addColorStop(0, '#2b7bb8');
     base.addColorStop(1, '#22659b');
     c.fillStyle = base;
     c.fillRect(0, 0, w, h);
     const rand = rng(41);
-    for (let i = 0; i < 21000; i++) { // felt nap
+    for (let i = 0; i < (lite ? 5000 : 14000); i++) { // felt nap
       c.fillStyle = `rgba(${rand() < 0.5 ? '255,255,255' : '0,20,40'},${rand() * 0.06})`;
       c.fillRect(rand() * w, rand() * h, 2, 2);
     }
@@ -537,7 +578,21 @@ function bannerTexture() {
     c.fillStyle = '#f5c400';
     c.fillRect(w / 2 - total / 2 - 150, mid - 3, 110, 6);
     c.fillRect(w / 2 + total / 2 + 40, mid - 3, 110, 6);
-  });
+  };
+  const texture = canvasTexture(1400, 990, draw);
+  // The page does not wait for the lettering's font. If it was not ready, the
+  // banner is drawn again when it arrives.
+  const font = '100px "Graduate"';
+  if (document.fonts && !document.fonts.check(font)) {
+    document.fonts.load(font).then(() => {
+      const c = texture.image.getContext('2d');
+      const scale = texture.image.width / 1400;
+      c.setTransform(scale, 0, 0, scale, 0, 0);
+      draw(c, 1400, 990);
+      texture.needsUpdate = true;
+    }).catch(() => {});
+  }
+  return texture;
 }
 
 // A felt banner thrown over the back of the sofa. It is a real cloth surface:
@@ -874,7 +929,8 @@ function framedArt(variant, w, h) {
 
 // ---------- the room ----------
 
-export function buildRoom() {
+export function buildRoom({ lite: isLite = false } = {}) {
+  lite = isLite;
   const room = new THREE.Group();
   const { left, right, back, front, height } = ROOM;
   const width = right - left;
@@ -987,10 +1043,6 @@ export function buildRoom() {
   // the table the board stands on
   room.add(coffeeTable(), tableThings());
 
-  // cool light from the window, to rim the pieces and the sofa
-  const dusk = new THREE.PointLight(0x7fb0e6, 240, 140, 1.7);
-  dusk.position.set(0, winY, back + 6);
-  room.add(dusk);
-
+  mergeStatic(room);
   return room;
 }

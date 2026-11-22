@@ -36,9 +36,13 @@ const panel = $('#panel');
 const plain = $('#plain');
 const hint = $('#hint');
 const demo = $('#demo');
+const zoom = $('#zoom');
 
 let board = null;
 let selected = null;
+let anchorAt = null;
+let anchorUntil = 0;
+const remeasure = () => { anchorAt = null; anchorUntil = performance.now() + 800; };
 
 // ---------- shared content blocks ----------
 
@@ -57,6 +61,27 @@ function photoBlock(p) {
       el('span', { class: 'det-tag' }, el('b', { text: p.photo.tag }), ' ', el('i', { text: p.photo.conf.toFixed(2) }))));
 }
 
+// Screenshots and clips. Images open larger when clicked.
+function mediaBlock(p) {
+  if (!p.media) return null;
+  const images = p.media.filter((m) => m.type !== 'video');
+  return el('div', { class: 'media' }, p.media.map((m) => {
+    if (m.type === 'video') {
+      const video = el('video', {
+        src: m.src, poster: m.poster, width: m.w, height: m.h, 'aria-label': m.alt,
+        loop: true, playsinline: true, preload: 'metadata', controls: reducedMotion,
+      });
+      video.muted = true;
+      if (!reducedMotion) video.autoplay = true;
+      return el('figure', { class: 'shot shot-wide' }, video, el('figcaption', { text: m.caption }));
+    }
+    return el('figure', { class: m.wide ? 'shot shot-wide' : 'shot' },
+      el('button', { type: 'button', class: 'shot-open', 'aria-label': `Enlarge: ${m.caption}`, onclick: () => openZoom(images, images.indexOf(m)) },
+        el('img', { src: m.src, alt: m.alt, width: m.w, height: m.h, loading: 'lazy', decoding: 'async' })),
+      el('figcaption', { text: m.caption }));
+  }));
+}
+
 function contentBlocks(p) {
   const out = [];
   if (p.meta) out.push(el('p', { class: 'meta', text: p.meta }));
@@ -64,6 +89,8 @@ function contentBlocks(p) {
   if (line) out.push(line);
   if (p.note) out.push(el('p', { class: 'note', text: p.note }));
   for (const text of p.body || []) out.push(el('p', { text }));
+  const media = mediaBlock(p);
+  if (media) out.push(media);
   for (const s of p.sections || []) {
     out.push(el('section', { class: 'sub' },
       el('h3', { text: s.title }),
@@ -131,13 +158,49 @@ function openDemo(p) {
   $('#demo-frame').src = p.demo.src;
   $('#demo-tab').href = p.demo.src;
   demo.showModal();
+  syncActive();
 }
 demo.addEventListener('close', () => { $('#demo-frame').src = 'about:blank'; });
 $('#demo-close').addEventListener('click', () => demo.close());
 
+let zoomSet = [];
+let zoomAt = 0;
+function showZoom(i) {
+  zoomAt = (i + zoomSet.length) % zoomSet.length;
+  const m = zoomSet[zoomAt];
+  const img = $('#zoom-img');
+  img.src = m.src;
+  img.alt = m.alt;
+  $('#zoom-caption').textContent = m.caption;
+  $('#zoom-count').textContent = zoomSet.length > 1 ? `${zoomAt + 1} of ${zoomSet.length}` : '';
+  $('#zoom-prev').hidden = $('#zoom-next').hidden = zoomSet.length < 2;
+}
+function openZoom(images, i) {
+  zoomSet = images;
+  showZoom(i);
+  zoom.showModal();
+  syncActive();
+}
+$('#zoom-prev').addEventListener('click', () => showZoom(zoomAt - 1));
+$('#zoom-next').addEventListener('click', () => showZoom(zoomAt + 1));
+$('#zoom-close').addEventListener('click', () => zoom.close());
+zoom.addEventListener('click', (e) => { if (e.target === zoom) zoom.close(); });
+zoom.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowLeft') showZoom(zoomAt - 1);
+  if (e.key === 'ArrowRight') showZoom(zoomAt + 1);
+});
+
+// The 3D scene stops drawing while a dialog covers it.
+const dialogOpen = () => demo.open || zoom.open;
+const syncActive = () => { if (board) board.setActive(document.body.dataset.mode === 'board' && !dialogOpen()); };
+for (const d of [demo, zoom]) d.addEventListener('close', syncActive);
+
 // ---------- plain page ----------
 
+let plainBuilt = false;
 function buildPlain() {
+  if (plainBuilt) return;
+  plainBuilt = true;
   const body = $('#plain-body');
   for (const g of groups) {
     body.append(
@@ -176,6 +239,7 @@ function show(id, { focus = false } = {}) {
     renderPanel(p);
     hint.classList.add('is-done');
   }
+  remeasure();
   panel.classList.toggle('is-open', Boolean(p));
   panel.inert = !p;
   document.body.classList.toggle('has-panel', Boolean(p));
@@ -190,8 +254,9 @@ function show(id, { focus = false } = {}) {
 
 function setMode(mode) {
   document.body.dataset.mode = mode;
+  if (mode === 'plain') buildPlain();
   plain.hidden = mode !== 'plain';
-  if (board) board.setActive(mode === 'board');
+  syncActive();
   if (mode === 'plain') show(null);
 }
 
@@ -219,9 +284,9 @@ function go(id) {
 
 window.addEventListener('hashchange', () => route({ focus: true }));
 window.addEventListener('popstate', () => route());
-window.addEventListener('resize', () => requestAnimationFrame(updateInsets));
+window.addEventListener('resize', () => { remeasure(); requestAnimationFrame(updateInsets); });
 window.addEventListener('keydown', (e) => {
-  if (demo.open || !selected || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (dialogOpen() || !selected || e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.key === 'Escape') go(null);
   const i = ordered.indexOf(byId.get(selected));
   if (e.key === 'ArrowRight') go(ordered[(i + 1) % ordered.length].id);
@@ -231,17 +296,11 @@ window.addEventListener('keydown', (e) => {
 // ---------- start ----------
 
 buildIndex();
-buildPlain();
 $('#name').textContent = person.name;
 $('#year').textContent = new Date().getFullYear();
 $('#tracked').textContent = `${pieces.length} pieces tracked`;
 
 try {
-  // The banner's lettering is drawn onto a texture, so its font has to be loaded first.
-  await Promise.race([
-    document.fonts.load('100px "Graduate"'),
-    new Promise((resolve) => setTimeout(resolve, 1500)),
-  ]).catch(() => {});
   const { createBoard } = await import('./board.js');
   board = createBoard({
     canvas: $('#scene'),
@@ -252,8 +311,12 @@ try {
     insets: currentInsets(),
     anchor: () => {
       if (!selected || isMobile()) return null;
-      const r = panel.getBoundingClientRect();
-      return { x: r.left, y: r.top + 24 };
+      // Measured only while the panel is sliding in; after that it does not move.
+      if (!anchorAt || performance.now() < anchorUntil) {
+        const r = panel.getBoundingClientRect();
+        anchorAt = { x: r.left, y: r.top + 24 };
+      }
+      return anchorAt;
     },
     onSelect: (id) => go(id),
     onHover: (id) => setHover(id),

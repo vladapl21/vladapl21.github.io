@@ -17,6 +17,11 @@
   <link rel="preload" href="fonts/sofia-sans.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="fonts/sofia-sans-extra-condensed.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="modulepreload" href="vendor/three.js">
+  <link rel="modulepreload" href="js/content.js">
+  <link rel="modulepreload" href="js/chess.js">
+  <link rel="modulepreload" href="js/board.js">
+  <link rel="modulepreload" href="js/room.js">
+  <link rel="modulepreload" href="js/pieces.js">
   <link rel="stylesheet" href="css/site.css">
 </head>
 <body data-mode="board">
@@ -59,6 +64,17 @@
       <button id="demo-close" type="button">Close</button>
     </header>
     <iframe id="demo-frame" title="Live demo" src="about:blank"></iframe>
+  </dialog>
+
+  <dialog id="zoom" aria-labelledby="zoom-caption">
+    <header>
+      <h2 id="zoom-caption"></h2>
+      <span id="zoom-count"></span>
+      <button id="zoom-prev" type="button">Previous</button>
+      <button id="zoom-next" type="button">Next</button>
+      <button id="zoom-close" type="button">Close</button>
+    </header>
+    <img id="zoom-img" alt="">
   </dialog>
 
   <noscript>
